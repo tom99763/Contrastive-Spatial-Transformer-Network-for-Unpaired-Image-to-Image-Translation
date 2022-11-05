@@ -1,4 +1,5 @@
 from modules import *
+import tensorflow as tf
 
 
 class Discriminator(tf.keras.Model):
@@ -34,7 +35,7 @@ class Patch_Discriminator(tf.keras.Model):
     ])
     
     for _ in range(self.num_downsampls):
-      dim * = 2
+      dim = dim * 2
       self.blocks.add(ConvBlock(dim, 4, strides=2, padding='same', use_bias=self.use_bias, norm_layer=self.norm, activation=tf.nn.leaky_relu))
       
     self.blocks.add(Padding2D(1, pad_type='constant'))
