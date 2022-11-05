@@ -13,7 +13,7 @@ class Discriminator(tf.keras.Model):
     elif disc_type == 'patch':
       self.disc = Patch_Discriminator(config)
     
-    elif disc_type == 'Mmlti_scale':
+    elif disc_type == 'Multi_scale':
       self.disc = None
     
   def call(self, x):
