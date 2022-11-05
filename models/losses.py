@@ -34,9 +34,9 @@ class GANLoss:
 
 
 class PatchNCELoss:
-    def __init__(self, nce_temp):
+    def __init__(self, tau):
         # Potential: only supports for batch_size=1 now.
-        self.nce_temp = nce_temp
+        self.tau = tau
         self.cross_entropy_loss = tf.keras.losses.CategoricalCrossentropy(
                                         reduction=tf.keras.losses.Reduction.NONE,
                                         from_logits=True)
@@ -52,8 +52,7 @@ class PatchNCELoss:
         for feat_s, feat_t in zip(feat_source_pool, feat_target_pool):
             n_patches, dim = feat_s.shape
 
-            logit = tf.matmul(feat_s, tf.transpose(feat_t)) / self.nce_temp
-
+            logit = tf.matmul(feat_s, tf.transpose(feat_t)) / self.tau
             # Diagonal entries are pos logits, the others are neg logits.
             diagonal = tf.eye(n_patches, dtype=tf.bool)
             target = tf.where(diagonal, 1.0, 0.0)
