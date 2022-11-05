@@ -117,7 +117,7 @@ class CUT(tf.keras.Model):
         y_idt = x2y[source.shape[0]:]
       
       critic_fake = self.D(x2y, training=True)
-      critic_real = self.D(y, training=True)
+      critic_real = self.D(target, training=True)
       
       ###compute loss
       d_loss, g_loss_ = gan_loss(critic_real, critic_fake, self.gan_mode)
