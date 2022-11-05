@@ -1,36 +1,18 @@
 import tensorflow as tf
 
-
-class GANLoss:
-    def __init__(self, gan_mode):
-        self.gan_mode = gan_mode
-        if gan_mode == 'lsgan':
-            self.loss = tf.keras.losses.MeanSquaredError()
-        elif gan_mode in ['wgangp', 'nonsaturating']:
-            self.loss = None
-        else:
-            raise NotImplementedError(f'gan mode {gan_mode} not implemented.')
-
-    def __call__(self, prediction, target_is_real):
-
-        if self.gan_mode == 'lsgan':
-            if target_is_real:
-                loss = self.loss(tf.ones_like(prediction), prediction)
-            else:
-                loss = self.loss(tf.zeros_like(prediction), prediction)
-
-        elif self.gan_mode == 'nonsaturating':
-            if target_is_real:
-                loss = tf.reduce_mean(tf.math.softplus(-prediction))
-            else:
-                loss = tf.reduce_mean(tf.math.softplus(prediction))
-                
-        elif self.gan_mode == 'wgangp':
-            if target_is_real:
-                loss = tf.reduce_mean(-prediction)
-            else:
-                loss = tf.reduce_mean(prediction)
-        return loss
+def gan_loss(critic_real, critic_fake, gan_mode):
+    if gan_mode == 'lsgan':
+        d_loss = tf.reduce_mean((1-critic_real) ** 2 + critic_fake ** 2)
+        g_loss = tf.reduce_mean((1-critic_fake) ** 2)
+        
+    elif gan_mode == 'nonsaturate':
+        d_loss = tf.reduce_mean(tf.math.softplus(-critic_real) + tf.math.softplus(critic_fake))
+        g_loss = tf.reduce_mean(tf.math.softplus(-critic_fake))
+        
+    elif gan_mode == 'wgangp':
+        d_loss = tf.reduce_mean(-critic_real + critic_fake)
+        g_loss = tf.reduce_mean(-critic_fake)
+    return d_loss, g_loss
 
 
 class PatchNCELoss:
