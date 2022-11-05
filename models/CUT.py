@@ -24,7 +24,7 @@ class Generator(tf.keras.Model):
       self.blocks.add(ConvBlock(dim, 3, strides=2, padding='same', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
       
     for _ in range(self.num_resblocks):
-      self.blocks.add(ResBlock(dim, 3, self.use_bias, self.norm_layer))
+      self.blocks.add(ResBlock(dim, 3, self.use_bias, self.norm))
       
     for _ in range(self.num_downsampls):
       dim  = dim / 2
