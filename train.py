@@ -10,13 +10,13 @@ def parse_opt():
     parser.add_argument('--output_dir', type=str, default='./outputs')
     parser.add_argument('--model', type=str, default='CUT')
     parser.add_argument('--num_epochs', type=int, default=400)
-    parser.add_argument('--batch_size', type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--image_size', type=int, default=256)
-    parser.add_argument('--val_size', type=int, default=256)
+    parser.add_argument('--val_size', type=int, default=0.2)
     parser.add_argument('--lr', type=float, default=2e-4, help='learning rate')
     parser.add_argument('--beta_1', type=float, default=0.5, help='momentum of adam')
     parser.add_argument('--beta_2', type=float, default=0.99, help='momentum of adam')
-    parser.add_argument('--num_samples', type=int, default=3)
+    parser.add_argument('--num_samples', type=int, default=4)
     opt, _ = parser.parse_known_args()
     return opt
   
