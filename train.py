@@ -27,9 +27,9 @@ def main():
   
   ds_train, ds_val = build_dataset(opt)
   
-  model.compile(G_optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule, beta_1=opt.beta_1, beta_2=opt.beta_2),
-                F_optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule, beta_1=opt.beta_1, beta_2=opt.beta_2),
-                D_optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule, beta_1=opt.beta_1, beta_2=opt.beta_2))
+  model.compile(G_optimizer = optimizers.Adam(learning_rate=opt.lr, beta_1=opt.beta_1, beta_2=opt.beta_2),
+                F_optimizer = optimizers.Adam(learning_rate=opt.lr, beta_1=opt.beta_1, beta_2=opt.beta_2),
+                D_optimizer = optimizers.Adam(learning_rate=opt.lr, beta_1=opt.beta_1, beta_2=opt.beta_2))
   
   ckpt_dir = f"{opt.ckpt_dir}/{opt.model}/{params}"
   if os.path.exists(ckpt_dir):
