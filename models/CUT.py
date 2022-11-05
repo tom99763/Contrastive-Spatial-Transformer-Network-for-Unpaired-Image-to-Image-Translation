@@ -1,6 +1,7 @@
 import tensorflow as tf
 from losses import *
 from modules import *
+from discriminators improt *
 
 class Generator(tf.keras.Model):
   def __init__(self, config):
