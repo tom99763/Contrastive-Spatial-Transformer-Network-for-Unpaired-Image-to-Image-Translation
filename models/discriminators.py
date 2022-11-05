@@ -6,13 +6,13 @@ class Discriminator(tf.keras.Model):
     super().__init__()
     disc_type = config['disc_type']
     
-    if disc_type == 'Classic':
+    if disc_type == 'classic':
       self.disc =None
     
-    elif disc_type == 'Patch':
+    elif disc_type == 'patch':
       self.disc = Patch_Discriminator(config)
     
-    elif disc_type == 'MultiScale':
+    elif disc_type == 'Mmlti_scale':
       self.disc = None
     
   def call(self, x):
