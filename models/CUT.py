@@ -116,7 +116,7 @@ class CUT(tf.keras.Model):
       x2y = y[:source.shape[0]]
       
       if self.use_identity:
-        y_idt = x2y[source.shape[0]:]
+        y_idt = y[source.shape[0]:]
       
       critic_fake = self.D(x2y, training=True)
       critic_real = self.D(target, training=True)
@@ -153,7 +153,7 @@ class CUT(tf.keras.Model):
     x2y = y[:source.shape[0]]
       
     if self.use_identity:
-      y_idt = x2y[source.shape[0]:]
+      y_idt = y[source.shape[0]:]
 
     ###compute loss
     nce_loss = self.nce_loss_func(source, x2y, self.E, self.F)
