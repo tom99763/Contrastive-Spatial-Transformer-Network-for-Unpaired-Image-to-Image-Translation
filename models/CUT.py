@@ -35,6 +35,13 @@ class Generator(tf.keras.Model):
     return self.blocks(x)
   
   
+def Encoder(generator, config):
+  nce_layers = config['nce_layers']
+  assert max(nce_layers) <= len(generator.layers) and min(nce_layers) >= 0
+  outputs = [generator.get_layer(index=idx).output for idx in nce_layers]
+  return tf.keras.Model(inputs=generator.input, outputs=outputs, name='encoder')
+
+  
 class PatchSampleMLP(tf.keras.Model):
     def __init__(self, config **kwargs):
         super(PatchSampleMLP, self).__init__(**kwargs)
@@ -73,12 +80,16 @@ class PatchSampleMLP(tf.keras.Model):
 
   
 class CVQAE(tf.keras.Model):
-  def __init__(self):
+  def __init__(self, config):
     super().__init__()
     
     self.G = Generator(config)
+    self.E = Encoder(self.G, config)
     self.Disc = Discriminator(config)
     self.PatchSampler = PatchSampleMLP(config)
+    
+    self.identity = config['identity']
+    self.lambda_nce = config['lambda_nce']
   
   @tf.function
   def train_step(self, inputs):
