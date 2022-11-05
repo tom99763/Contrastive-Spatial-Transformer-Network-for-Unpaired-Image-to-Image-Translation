@@ -56,47 +56,22 @@ class VisualizeCallback(callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         b, h, w, c = self.target.shape
-        xa_repeat = tf.repeat(self.source, b, axis=0)
-        xb_repeat = tf.reshape(tf.stack([self.target for _ in range(b)], axis=0), (b ** 2, h, w, c))
+        x2y = self.model.G(self.source)
         
-        try:
-            ca, sa = self.model.G.encode(xa_repeat)
-            cb, sb = self.model.G.encode(xb_repeat)
-            xa2b = self.model.G.decode(ca, sb)
-        except:
-            ca, sa = self.model.Ga.encode(xa_repeat)
-            cb, sb = self.model.Gb.encode(xb_repeat)
-            xa2b = self.model.Gb.decode(ca, sb)
+        fig, ax = plt.subplots(ncols = b, nrows = 2, figsize = (8, 8))
         
-        source = self.source * 0.5 + 0.5
-        target = self.target * 0.5 + 0.5
-        xa2b = xa2b * 0.5 + 0.5
-        
-        fig, ax = plt.subplots(ncols=b + 1, nrows=b + 1, figsize=(8, 8))
-        for k in range(b + 1):
-            if k == 0:
-                ax[0, k].imshow(tf.ones(source[0].shape))
-                ax[0, k].axis('off')
-            else:
-                ax[0, k].imshow(source[k - 1])
-                ax[0, k].axis('off')
-                
-        for k in range(1, b + 1):
-            ax[k, 0].imshow(target[k - 1])
-            ax[k, 0].axis('off')
-                
-        k = 0
-        for j in range(b):
-            for i in range(b):
-                ax[i + 1, j + 1].imshow(xa2b[k])
-                ax[i + 1, j + 1].axis('off')
-                k += 1
+        for i in range(b):
+            ax[0, i].imshow(source[i] * 0.5 + 0.5)
+            ax[0, i].axis('off')
+            ax[1, i].imshow(x2y[i] * 0.5 + 0.5)
+            ax[1, i].axis('off')
+            
         plt.tight_layout()
         dir = f'{self.opt.output_dir}/{self.opt.model}/{self.params_}'
         if not os.path.exists(dir):
             os.makedirs(dir)
         plt.savefig(f'{dir}/synthesis_{epoch}.jpg')
-
+            
 
 def set_callbacks(opt, params, source, target):
     ckpt_dir = f"{opt.ckpt_dir}/{opt.model}"
