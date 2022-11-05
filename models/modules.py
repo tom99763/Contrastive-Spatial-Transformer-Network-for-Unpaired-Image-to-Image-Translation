@@ -65,7 +65,7 @@ class ConvBlock(layers.Layer):
                              padding,
                              use_bias=use_bias,
                              kernel_initializer=initializer)
-        self.activation = Activation(activation)
+        self.activation = layers.Activation(activation)
         if norm_layer == 'batch':
             self.normalization = layers.BatchNormalization()
         elif norm_layer == 'instance':
@@ -79,7 +79,7 @@ class ConvBlock(layers.Layer):
         x = self.activation(x)
         return x
       
-class ConvTransposeBlock(Layer):
+class ConvTransposeBlock(layers.Layer):
     """ ConvTransposeBlock layer consists of Conv2DTranspose + Normalization + Activation.
     """
     def __init__(self,
@@ -114,7 +114,7 @@ class ConvTransposeBlock(Layer):
         return x
 
 
-class ResBlock(Layer):
+class ResBlock(layers.Layer):
     def __init__(self,
                  filters,
                  kernel_size,
