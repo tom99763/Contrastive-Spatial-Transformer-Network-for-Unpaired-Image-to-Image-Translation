@@ -16,7 +16,7 @@ def parse_opt():
     parser.add_argument('--lr', type=float, default=2e-4, help='learning rate')
     parser.add_argument('--beta_1', type=float, default=0.5, help='momentum of adam')
     parser.add_argument('--beta_2', type=float, default=0.99, help='momentum of adam')
-    parser.add_argument('--num_samples', type=int, default=4)
+    parser.add_argument('--num_samples', type=int, default=3)
     opt, _ = parser.parse_known_args()
     return opt
   
