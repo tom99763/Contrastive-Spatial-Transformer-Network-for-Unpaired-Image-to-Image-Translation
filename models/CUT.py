@@ -2,6 +2,7 @@ import tensorflow as tf
 from losses import *
 from modules import *
 from discriminators import *
+from tensorflow.keras import layers
 
 class Generator(tf.keras.Model):
   def __init__(self, config):
@@ -19,14 +20,14 @@ class Generator(tf.keras.Model):
     ])
     
     for _ in range(self.num_downsampls):
-      dim * = 2
+      dim = dim  * 2
       self.blocks.add(ConvBlock(dim, 3, strides=2, padding='same', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
       
     for _ in range(self.num_resblocks):
       self.blocks.add(ResBlock(dim, 3, self.use_bias, self.norm_layer))
       
     for _ in range(self.num_downsampls):
-      dim / = 2
+      dim  = dim / 2
       self.blocks.add(ConvTransposeBlock(dim, 3, strides=2, padding='same', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
     self.blocks.add(Padding2D(3, pad_type='reflect'))
     self.blocks.add(ConvBlock(3, 7, padding='valid', activation='tanh'))
@@ -47,15 +48,15 @@ class PatchSampleMLP(tf.keras.Model):
         super(PatchSampleMLP, self).__init__(**kwargs)
         self.units = config['units']
         self.num_patches = config['num_patches']
-        self.l2_norm = Lambda(lambda x: x * tf.math.rsqrt(tf.reduce_sum(tf.square(x), axis=-1, keepdims=True) + 1e-10))
+        self.l2_norm = layers.Lambda(lambda x: x * tf.math.rsqrt(tf.reduce_sum(tf.square(x), axis=-1, keepdims=True) + 1e-10))
 
     def build(self, input_shape):
         initializer = tf.random_normal_initializer(0., 0.02)
         feats_shape = input_shape
         for feat_id in range(len(feats_shape)):
             mlp = tf.keras.models.Sequential([
-                    Dense(self.units, activation="relu", kernel_initializer=initializer),
-                    Dense(self.units, kernel_initializer=initializer),
+                    layers.Dense(self.units, activation="relu", kernel_initializer=initializer),
+                    layers.Dense(self.units, kernel_initializer=initializer),
                 ])
             setattr(self, f'mlp_{feat_id}', mlp)
 
@@ -97,7 +98,7 @@ class CUT(tf.keras.Model):
               G_optimizer,
               F_optimizer,
               D_optimizer):
-      super(CUT_model, self).compile()
+      super(CUT, self).compile()
       self.G_optimizer = G_optimizer
       self.F_optimizer = F_optimizer
       self.D_optimizer = D_optimizer
