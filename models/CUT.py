@@ -15,6 +15,7 @@ class Generator(tf.keras.Model):
     dim = config['base']
     
     self.blocks = tf.keras.Sequential([
+      layers.Input([None, None, 3])
       Padding2D(3, pad_type='reflect'),
       ConvBlock(dim, 7, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act),
     ])
@@ -38,8 +39,9 @@ class Generator(tf.keras.Model):
   
 def Encoder(generator, config):
   nce_layers = config['nce_layers']
-  assert max(nce_layers) <= len(generator.layers) and min(nce_layers) >= 0
-  outputs = [generator.get_layer(index=idx).output for idx in nce_layers]
+  outputs = []
+  for idx in nce_layers:
+    outputs.append(generator.layers[idx].output)
   return tf.keras.Model(inputs=generator.input, outputs=outputs, name='encoder')
 
   
@@ -86,7 +88,7 @@ class CUT(tf.keras.Model):
     
     self.G = Generator(config)
     self.D = Discriminator(config)
-    self.E = Encoder(self.G, config)
+    self.E = Encoder(self.G.blocks, config)
     self.F = PatchSampleMLP(config)
     
     self.gan_mode = config['gan_mode']
