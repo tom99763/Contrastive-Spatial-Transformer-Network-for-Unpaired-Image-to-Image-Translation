@@ -61,7 +61,7 @@ class VisualizeCallback(callbacks.Callback):
         fig, ax = plt.subplots(ncols = b, nrows = 2, figsize = (8, 8))
         
         for i in range(b):
-            ax[0, i].imshow(source[i] * 0.5 + 0.5)
+            ax[0, i].imshow(self.source[i] * 0.5 + 0.5)
             ax[0, i].axis('off')
             ax[1, i].imshow(x2y[i] * 0.5 + 0.5)
             ax[1, i].axis('off')
