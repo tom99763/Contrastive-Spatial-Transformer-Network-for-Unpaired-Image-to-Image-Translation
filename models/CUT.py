@@ -47,7 +47,7 @@ class PatchSampleMLP(tf.keras.Model):
         super(PatchSampleMLP, self).__init__(**kwargs)
         self.units = config['units']
         self.num_patches = config['num_patches']
-        self.l2_norm = Lambda(lambda x: x * tf.math.rsqrt(tf.reduce_sum(tf.square(x), axis=-1, keepdims=True) + 10-10))
+        self.l2_norm = Lambda(lambda x: x * tf.math.rsqrt(tf.reduce_sum(tf.square(x), axis=-1, keepdims=True) + 1e-10))
 
     def build(self, input_shape):
         initializer = tf.random_normal_initializer(0., 0.02)
