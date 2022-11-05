@@ -12,7 +12,7 @@ def gan_loss(critic_real, critic_fake, gan_mode):
     elif gan_mode == 'wgangp':
         d_loss = tf.reduce_mean(-critic_real + critic_fake)
         g_loss = tf.reduce_mean(-critic_fake)
-    return d_loss, g_loss
+    return 0.5 * d_loss, g_loss
 
 
 class PatchNCELoss:
