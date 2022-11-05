@@ -43,7 +43,7 @@ def Encoder(generator, config):
 
   
 class PatchSampleMLP(tf.keras.Model):
-    def __init__(self, config **kwargs):
+    def __init__(self, config, **kwargs):
         super(PatchSampleMLP, self).__init__(**kwargs)
         self.units = config['units']
         self.num_patches = config['num_patches']
@@ -79,22 +79,85 @@ class PatchSampleMLP(tf.keras.Model):
         return samples, ids
 
   
-class CVQAE(tf.keras.Model):
+class CUT(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
     
     self.G = Generator(config)
+    self.D = Discriminator(config)
     self.E = Encoder(self.G, config)
-    self.Disc = Discriminator(config)
-    self.PatchSampler = PatchSampleMLP(config)
+    self.F = PatchSampleMLP(config)
     
-    self.identity = config['identity']
+    self.gan_mode = config['gan_mode']
+    self.use_identity = config['use_identity']
     self.lambda_nce = config['lambda_nce']
+    self.tau = config['tau']
+    
+  def compile(self,
+              G_optimizer,
+              F_optimizer,
+              D_optimizer):
+      super(CUT_model, self).compile()
+      self.G_optimizer = G_optimizer
+      self.F_optimizer = F_optimizer
+      self.D_optimizer = D_optimizer
+      self.gan_loss_func = GANLoss(self.gan_mode)
+      self.nce_loss_func = PatchNCELoss(self.tau)
   
   @tf.function
   def train_step(self, inputs):
-    return 
+    source, target = inputs
+    x = tf.concat([source, target], axis=0) if self.use_identity else source
+    
+    with tf.GradientTape(persistent=True) as tape:
+      y = self.G(x, training=True)
+      x2y = y[:source.shape[0]]
+      
+      if self.use_identity:
+        y_idt = x2y[source.shape[0]:]
+      
+      critic_fake = self.D(x2y, training=True)
+      critic_real = self.D(y, training=True)
+      
+      ###compute loss
+      g_loss_ = tf.reduce_mean(self.gan_loss_func(critic_fake, True))
+      nce_loss = self.nce_loss_func(source, x2y, self.E, self.F)
+      
+      if self.use_identity:
+        nce_idt_loss = self.nce_loss_func(target, y_idt, self.E, self.F)
+        nce_loss = (nce_loss + nce_idt_loss) * 0.5
+        
+      g_loss = g_loss_ + self.lambda_nce * nce_loss
+      d_loss = 0.5 * tf.reduce_mean(self.gan_loss_func(critic_fake, False) + self.gan_loss_func(critic_real, True))
+      
+    G_grads = tape.gradient(g_loss, self.G.trainable_weights)
+    D_grads = tape.gradient(d_loss, self.D.trainable_weights)
+    F_grads = tape.gradient(nce_loss, self.F.trainable_weights)
+    
+    self.G_optimizer.apply_gradients(zip(G_grads, self.G.trainable_weights))
+    self.D_optimizer.apply_gradients(zip(D_grads, self.D.trainable_weights))
+    self.F_optimizer.apply_gradients(zip(F_grads, self.F.trainable_weights))
+      
+    del tape
+    
+    return {'g_loss': g_loss_, 'd_loss':d_loss, 'nce': nce_loss}
   
   @tf.function
   def test_step(self, inputs):
-    return 
+    source, target = inputs
+    x = tf.concat([source, target], axis=0) if self.use_identity else source
+    
+    y = self.G(x, training=True)
+    x2y = y[:source.shape[0]]
+      
+    if self.use_identity:
+      y_idt = x2y[source.shape[0]:]
+
+    ###compute loss
+    nce_loss = self.nce_loss_func(source, x2y, self.E, self.F)
+      
+    if self.use_identity:
+      nce_idt_loss = self.nce_loss_func(target, y_idt, self.E, self.F)
+      nce_loss = (nce_loss + nce_idt_loss) * 0.5
+
+    return {'nce': nce_loss}
