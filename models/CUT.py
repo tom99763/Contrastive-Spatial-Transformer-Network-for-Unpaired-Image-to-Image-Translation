@@ -101,7 +101,6 @@ class CUT(tf.keras.Model):
       self.G_optimizer = G_optimizer
       self.F_optimizer = F_optimizer
       self.D_optimizer = D_optimizer
-      self.gan_loss_func = GANLoss(self.gan_mode)
       self.nce_loss_func = PatchNCELoss(self.tau)
   
   @tf.function
@@ -120,7 +119,8 @@ class CUT(tf.keras.Model):
       critic_real = self.D(y, training=True)
       
       ###compute loss
-      g_loss_ = tf.reduce_mean(self.gan_loss_func(critic_fake, True))
+      d_loss, g_loss_ = gan_loss(critic_real, critic_fake, self.gan_mode)
+      
       nce_loss = self.nce_loss_func(source, x2y, self.E, self.F)
       
       if self.use_identity:
@@ -128,7 +128,6 @@ class CUT(tf.keras.Model):
         nce_loss = (nce_loss + nce_idt_loss) * 0.5
         
       g_loss = g_loss_ + self.lambda_nce * nce_loss
-      d_loss = 0.5 * tf.reduce_mean(self.gan_loss_func(critic_fake, False) + self.gan_loss_func(critic_real, True))
       
     G_grads = tape.gradient(g_loss, self.G.trainable_weights)
     D_grads = tape.gradient(d_loss, self.D.trainable_weights)
