@@ -24,6 +24,5 @@ class Generator(tf.keras.Model):
   pass
 
 
-
 class VQCUT(tf.keras.Model):
   pass
