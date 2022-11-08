@@ -2,13 +2,14 @@ from modules import *
 from losses import *
 import tensorflow as tf
 from tensorflow.keras import layers
+from discriminators import *
 
 
 class VectorQuantizer(layers.Layer):
-    def __init__(self,n_embs,beta=0.25):
+    def __init__(self, config):
         super().__init__()
-        self.n_embs=n_embs
-        self.beta=beta
+        self.n_embs=config['n_embs']
+        self.beta=config['beta']
         
     def build(self,shape):
         emb_dim=shape[-1]
@@ -55,8 +56,28 @@ class Decoder(tf.keras.Model):
 
 
 class Generator(tf.keras.Model):
-  pass
+  def __init__(self, config):
+    super().__init__()
+    self.E = Encoder(config)
+    self.D = Decoder(config)
+    self.VQ = VectorQuantizer(config)
+    
+  def call(self, x):
+    x = self.E(x)
+    x = self.VQ(x)
+    x = self.D(x)
+    return x
 
 
 class VQCUT(tf.keras.Model):
-  pass
+  def __init__(self, config):
+    self.Ga = Generator(config)
+    self.Gb = Generator(config)
+    self.Da = Discriminator(config)
+    self.Db = Discrminator(config)
+    
+  @tf.function
+  def train_step(self, inputs):
+    pass
+    
+    
