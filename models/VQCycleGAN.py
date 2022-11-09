@@ -123,8 +123,9 @@ class VQCycleGAN(tf.keras.Model):
             l_cyc = l1(xa, xaba) + l1(xb, xbab)
             l_da, l_ga = gan_loss(critic_a_real, critic_a_fake, self.config['gan_mode'])
             l_db, l_gb = gan_loss(critic_b_real, critic_b_fake, self.config['gan_mode'])
+            l_vq = self.Ga.losses + self.Gb.losses
         
-            g_loss = self.config['lambda_idt'] * l_idt + self.config['lambda_cyc'] * l_cyc + l_ga + l_gb
+            g_loss = l_vq + self.config['lambda_idt'] * l_idt + self.config['lambda_cyc'] * l_cyc + l_ga + l_gb
             d_loss = l_da + l_db
             
         g_grads = tape.gradient(g_loss, self.Ga.trainable_weights + self.Gb.trainable_weights)
@@ -132,7 +133,7 @@ class VQCycleGAN(tf.keras.Model):
         self.G_opt.apply_gradients(zip(g_grads, self.Ga.trainable_weights + self.Gb.trainable_weights))
         self.D_opt.apply_gradients(zip(d_grads, self.Da.trainable_weights + self.Db.trainable_weights))
     
-        return {'identity':l_idt, 'cycle':l_cyc, 'g_loss': l_ga + l_gb, 'd_loss': l_da + l_db}
+        return {'vq':l_vq, 'identity':l_idt, 'cycle':l_cyc, 'g_loss': l_ga + l_gb, 'd_loss': l_da + l_db}
     
     @tf.function
     def test_step(self, inputs):
@@ -147,5 +148,6 @@ class VQCycleGAN(tf.keras.Model):
         ###compute loss
         l_idt = l1(xa, xaa) + l1(xb, xbb)
         l_cyc = l1(xa, xaba) + l1(xb, xbab)
-        return {'identity':l_idt, 'cycle':l_cyc}
+        l_vq = self.Ga.losses + self.Gb.losses
+        return {'vq':l_vq, 'identity':l_idt, 'cycle':l_cyc}
     
