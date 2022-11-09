@@ -82,6 +82,7 @@ class Generator(tf.keras.Model):
   def call(self, x):
     x = self.encoder(x)
     x = self.quantizer(x)
+    x = self.resblocks(x)
     x = self.decoder(x)
     return x
 
