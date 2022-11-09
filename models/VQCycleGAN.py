@@ -46,25 +46,43 @@ class VectorQuantizer(layers.Layer):
         return idx
   
 
-class Encoder(tf.keras.Model):
-  pass
-
-
-class Decoder(tf.keras.Model):
-  pass
-
-
 class Generator(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
-    self.E = Encoder(config)
-    self.D = Decoder(config)
-    self.VQ = VectorQuantizer(config)
+    self.act = config['act']
+    self.use_bias = config['use_bias']
+    self.norm = config['norm']
+    self.num_downsampls = config['num_downsamples']
+    self.num_resblocks = config['num_resblocks']
+    dim = config['base']
+    
+    self.encoder = tf.keras.Sequential([
+      layers.Input([None, None, 3])
+      Padding2D(3, pad_type='reflect'),
+      ConvBlock(dim, 7, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act),
+    ])
+    
+    for _ in range(self.num_downsampls):
+      dim = dim  * 2
+      self.encoder.add(ConvBlock(dim, 3, strides=2, padding='same', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
+    
+    self.resblocks = tf.keras.Sequential()
+    for _ in range(self.num_resblocks):
+      self.resblocks.add(ResBlock(dim, 3, self.use_bias, self.norm))
+      
+    self.decoder=tf.keras.Sequential()
+    for _ in range(self.num_downsampls):
+      dim  = dim / 2
+      self.decoder.add(ConvTransposeBlock(dim, 3, strides=2, padding='same', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
+    self.decoder.add(Padding2D(3, pad_type='reflect'))
+    self.decoder.add(ConvBlock(3, 7, padding='valid', activation='tanh'))
+    
+    self.quantizer = VectorQuantizer(config)
     
   def call(self, x):
-    x = self.E(x)
-    x = self.VQ(x)
-    x = self.D(x)
+    x = self.encoder(x)
+    x = self.quantizer(x)
+    x = self.decoder(x)
     return x
 
 
