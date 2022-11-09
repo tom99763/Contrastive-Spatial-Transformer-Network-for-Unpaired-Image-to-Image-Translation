@@ -4,7 +4,6 @@ import tensorflow as tf
 from tensorflow.keras import layers
 from discriminators import *
 
-
 class VectorQuantizer(layers.Layer):
     def __init__(self, config):
         super().__init__()
@@ -69,15 +68,65 @@ class Generator(tf.keras.Model):
     return x
 
 
-class VQCUT(tf.keras.Model):
-  def __init__(self, config):
-    self.Ga = Generator(config)
-    self.Gb = Generator(config)
-    self.Da = Discriminator(config)
-    self.Db = Discrminator(config)
-    
-  @tf.function
+class VQCycleGAN(tf.keras.Model):
+    def __init__(self, config):
+        self.Ga = Generator(config)
+        self.Gb = Generator(config)
+        self.Da = Discriminator(config)
+        self.Db = Discrminator(config)
+        self.config=config
+    def compile(self,
+                G_opt,
+                D_opt):
+        super(VQCycleGAN, self).compile()
+        self.G_opt = G_opt
+        self.D_opt = D_opt
+    @tf.function
   def train_step(self, inputs):
-    pass
+        xa, xb = inputs
+        with tf.GradientTape(persistent=True) as Tape:
+            #generation
+            xaa = self.Ga(xa)
+            xbb = self.Gb(xb)
+            xab = self.Gb(xa)
+            xba = self.Ga(xb)
+            xaba = self.Ga(xab)
+            xbab = self.Gb(xba)
+        
+            #discrimination
+            critic_a_real = self.Da(xa)
+            critic_b_real = self.Da(xb)
+            critic_a_fake = self.Da(xba)
+            critic_b_fake = self.Da(xab)
+        
+            ###compute loss
+            l_idt = l1(xa, xaa) + l1(xb, xbb)
+            l_cyc = l1(xa, xaba) + l1(xb, xbab)
+            l_da, l_ga = gan_loss(critic_a_real, critic_a_fake, self.config['gan_mode'])
+            l_db, l_gb = gan_loss(critic_b_real, critic_b_fake, self.config['gan_mode'])
+        
+            g_loss = self.config['lambda_idt'] * l_idt + self.config['lambda_cyc'] * l_cyc + l_ga + l_gb
+            d_loss = l_da + l_db
+            
+        g_grads = tape.gradient(g_loss, self.Ga.trainable_weights + self.Gb.trainable_weights)
+        d_grads = tape.gradient(g_loss, self.Da.trainable_weights + self.Db.trainable_weights)
+        self.G_opt.apply_gradients(zip(g_grads, self.Ga.trainable_weights + self.Gb.trainable_weights))
+        self.D_opt.apply_gradients(zip(d_grads, self.Da.trainable_weights + self.Db.trainable_weights))
     
+        return {'identity':l_idt, 'cycle':l_cyc, 'g_loss': l_ga + l_gb, 'd_loss': l_da + l_db}
+    
+    @tf.function
+    def test_step(self, inputs):
+        xa, xb = inputs
+        xaa = self.Ga(xa)
+        xbb = self.Gb(xb)
+        xab = self.Gb(xa)
+        xba = self.Ga(xb)
+        xaba = self.Ga(xab)
+        xbab = self.Gb(xba)
+        
+        ###compute loss
+        l_idt = l1(xa, xaa) + l1(xb, xbb)
+        l_cyc = l1(xa, xaba) + l1(xb, xbab)
+        return {'identity':l_idt, 'cycle':l_cyc}
     
