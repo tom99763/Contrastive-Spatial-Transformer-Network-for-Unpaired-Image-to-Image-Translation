@@ -1,20 +1,27 @@
-from modules import *
 import tensorflow as tf
+from losses import *
+from modules import *
+from discriminators import *
 
-class UNET(tf.keras.Model):
+class STN(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
-    
+
   def call(self, x):
     pass
 
 class Generator(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
-    self.encoder = self.build_encoder()
+    self.config=config
+    self.E = self.build_encoder()
+    self.stn = STN(config)
     
   def call(self, x):
-    pass
+    return
+  
+  def wrap(self, x):
+    return
   
   def build_encoder(self):
     nce_layers = self.config['nce_layers']
@@ -60,31 +67,58 @@ class PatchSampler(tf.keras.Model):
             ids.append(patch_id)
         return samples, ids
 
-      
-class STN(tf.keras.Model):
-  def __init__(self, config):
-    super().__init__()
-
-  def call(self, x):
-    pass
-
-
 class CUTSTN(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
-    self.landmarker = UNET(config)
-    self.synthesizer = Generator(config)
-    self.discriminator = Discriminator(config)
-    self.patch_sampler = PatchSampler(config)
-    self.stn =STN(config)
+    self.G = Generator(config)
+    self.D = Discriminator(config)
+    self.F = PatchSampler(config)
+    self.config = config
+  def compile(self,
+              G_optimizer,
+              F_optimizer,
+              D_optimizer):
+      super(CUT, self).compile()
+      self.G_optimizer = G_optimizer
+      self.F_optimizer = F_optimizer
+      self.D_optimizer = D_optimizer
+      self.nce_loss_func = PatchNCELoss(self.tau)
   
   @tf.function
   def train_step(self, inputs):
-    pass
-  
+    la, xb = inputs
+    
+    with tf.GradientTape(persistent=True) as tape:
+      #synthesize texture
+      xab = self.G(la)
+      
+      #discrimination
+      critic_fake = self.D(xab, training=True)
+      critic_real = self.D(xb, training=True)
+      
+      ###compute losses
+      d_loss, g_loss_ = gan_loss(critic_real, critic_fake, self.gan_mode)
+      nce_loss = self.nce_loss_func(la, xab, self.G.E, self.F)
+      g_loss = g_loss_ + self.config['lambda_nce'] * nce_loss
+      
+    G_grads = tape.gradient(g_loss, self.G.trainable_weights)
+    D_grads = tape.gradient(d_loss, self.D.trainable_weights)
+    F_grads = tape.gradient(nce_loss, self.F.trainable_weights)
+    
+    self.G_optimizer.apply_gradients(zip(G_grads, self.G.trainable_weights))
+    self.D_optimizer.apply_gradients(zip(D_grads, self.D.trainable_weights))
+    self.F_optimizer.apply_gradients(zip(F_grads, self.F.trainable_weights))
+      
+    del tape
+    
+    return {'g_loss': g_loss_, 'd_loss':d_loss, 'nce': nce_loss}
+      
   @tf.function
   def test_step(self, inputs):
-    pass
+    la, xb = inputs
+    xab = self.G(la) 
+    nce_loss = self.nce_loss_func(la, xab, self.G.E, self.F)
+    return {'nce': nce_loss}
   
   
   
