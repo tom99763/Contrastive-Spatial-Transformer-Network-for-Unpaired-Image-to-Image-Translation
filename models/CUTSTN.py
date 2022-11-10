@@ -186,7 +186,7 @@ class Generator(tf.keras.Model):
         outputs = []
         for idx in nce_layers:
             outputs.append(self.blocks.layers[idx].output)
-        return tf.keras.Model(inputs=self.input, outputs=outputs)
+        return tf.keras.Model(inputs=self.input, outputs=outputs, name = 'encoder')
 
 
 class PatchSampler(tf.keras.Model):
