@@ -177,6 +177,7 @@ class Generator(tf.keras.Model):
     def call(self, inputs):
         x, z = inputs
         x = self.wrap(x)
+        z = tf.repeat(tf.repeat(x, z[:, None, None, :], x.shape[1], axis=1), x.shape[2], axis=2)
         x = tf.concat([x, self.scale * z], axis=-1)
         x = self.blocks(x)
         return x
@@ -254,7 +255,7 @@ class CUTSTN(tf.keras.Model):
 
         with tf.GradientTape(persistent=True) as tape:
             # synthesize texture
-            z = tf.random.normal(la.shape)
+            z = tf.random.normal((la.shape[0], 3))
             xab = self.G([la, z])
 
             # discrimination
@@ -281,7 +282,7 @@ class CUTSTN(tf.keras.Model):
     @tf.function
     def test_step(self, inputs):
         la, xb = inputs
-        z = tf.random.normal(la.shape)
+        z = tf.random.normal((la.shape[0], 3))
         xab = self.G([la, z])
         nce_loss = self.nce_loss_func(la, xab, self.G.E, self.F)
         return {'nce': nce_loss}
