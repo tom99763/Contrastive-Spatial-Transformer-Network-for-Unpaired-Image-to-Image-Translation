@@ -124,6 +124,7 @@ class STN(tf.keras.Model):
         units=6,   
         bias_initializer=initializers.constant([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
         kernel_initializer='zeros')))
+    self.blocks.add(layers.Reshape((2, 3)))
     return blocks
 
   
