@@ -115,7 +115,7 @@ class STN(tf.keras.Model):
     ])
     
     for _ in range(4):
-        dim = dim  * 2
+        dim = min(dim  * 2, self.config['max_filters'])
         self.blocks.add(ConvBlock(dim, 3, strides=2, padding='same',
                                 use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
     self.blocks.add(layers.Flatten())
