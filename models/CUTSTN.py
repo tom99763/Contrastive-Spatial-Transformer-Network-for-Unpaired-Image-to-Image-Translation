@@ -123,10 +123,10 @@ class STN(tf.keras.Model):
             blocks.add(layers.LeakyReLU(0.2))
         blocks.add(layers.Flatten())
         blocks.add(layers.Dense(self.config['max_filters'], activation=self.act))
-        blocks.add(layers.Dense(layers.Dense(
+        blocks.add(layers.Dense(
             units=6,
             bias_initializer=initializers.constant([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]),  # initialize as A = [I, t]
-            kernel_initializer='zeros')))
+            kernel_initializer='zeros'))
         blocks.add(layers.Reshape((2, 3)))
         return blocks
 
