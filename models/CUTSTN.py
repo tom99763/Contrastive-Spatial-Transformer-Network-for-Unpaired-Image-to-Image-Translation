@@ -2,18 +2,21 @@ import tensorflow as tf
 from losses import *
 from modules import *
 from discriminators import *
+from tensorflow.keras import initializers, preprocessing
 
 class STN(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
+    self.config = config
     self.localizer = build_localizer()
 
   def call(self, x):
-    pass
+    theta = self.localizer(x) #(b, 2, 3)
   
   def build_localizer(self):
-    pass
+    return 
 
+  
 class Generator(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
