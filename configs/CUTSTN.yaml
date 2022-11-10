@@ -1,5 +1,6 @@
 #network
 base: 64
+max_filters: 256
 num_downsamples: 2
 num_resblocks: 9
 use_bias: True
