@@ -62,7 +62,7 @@ class VisualizeCallback(callbacks.Callback):
         b, h, w, c = self.target.shape
         
         
-        if opt.model == 'CUTSTN':
+        if self.opt.model == 'CUTSTN':
             z = tf.random.normal(self.source.shape)
             x2y = self.model.G([self.source, z])
             source_wrapped = self.model.wrap(self.source)
@@ -75,7 +75,7 @@ class VisualizeCallback(callbacks.Callback):
             ax[0, i].imshow(self.source[i] * 0.5 + 0.5)
             ax[0, i].axis('off')
             
-            if opt.model == 'CUTSTN':
+            if self.opt.model == 'CUTSTN':
                 ax[1, i].imshow(source_wrapped[i] * 0.5 + 0.5)
                 ax[1, i].axis('off')
                 ax[2, i].imshow(x2y[i] * 0.5 + 0.5)
