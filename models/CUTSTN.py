@@ -119,7 +119,8 @@ class STN(tf.keras.Model):
         for _ in range(4):
             dim = min(dim * 2, self.config['max_filters'])
             blocks.add(ConvBlock(dim, 3, strides=2, padding='same',
-                                      use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
+                                      use_bias=self.use_bias, norm_layer=self.norm))
+            blocks.add(layers.LeakyReLU(0.2))
         blocks.add(layers.Flatten())
         blocks.add(layers.Dense(self.config['max_filters']), activation=self.act)
         blocks.add(layers.Dense(layers.Dense(
