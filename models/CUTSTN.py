@@ -1,4 +1,6 @@
 import tensorflow as tf
+import sys
+sys.path.append('./models')
 from losses import *
 from modules import *
 from discriminators import *
@@ -119,7 +121,7 @@ class STN(tf.keras.Model):
             blocks.add(ConvBlock(dim, 3, strides=2, padding='same',
                                       use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
         blocks.add(layers.Flatten())
-        blocks.add(LinearBlock(self.config['max_filters']), activation=self.act)
+        blocks.add(layers.Dense(self.config['max_filters']), activation=self.act)
         blocks.add(layers.Dense(layers.Dense(
             units=6,
             bias_initializer=initializers.constant([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]),  # initialize as A = [I, t]
@@ -239,7 +241,7 @@ class CUTSTN(tf.keras.Model):
                 G_optimizer,
                 F_optimizer,
                 D_optimizer):
-        super(CUT, self).compile()
+        super().compile()
         self.G_optimizer = G_optimizer
         self.F_optimizer = F_optimizer
         self.D_optimizer = D_optimizer
@@ -282,5 +284,4 @@ class CUTSTN(tf.keras.Model):
         xab = self.G([la, z])
         nce_loss = self.nce_loss_func(la, xab, self.G.E, self.F)
         return {'nce': nce_loss}
-
 
