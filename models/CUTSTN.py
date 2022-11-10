@@ -152,7 +152,8 @@ class Generator(tf.keras.Model):
             dim = dim * 2
             self.blocks.add(ConvBlock(dim, 3, strides=2, padding='same',
                                       use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
-
+            
+        self.blocks.add(layers.Lambda(lambda x: x + tf.random.normal((x.shape[0], 1, 1, x.shape[-1]))))
         for _ in range(self.num_resblocks):
             self.blocks.add(ResBlock(dim, 3, self.use_bias, self.norm))
 
