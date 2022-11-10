@@ -14,14 +14,17 @@ class Generator(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
     self.config=config
+    self.blocks = None
     self.E = self.build_encoder()
     self.stn = STN(config)
     
   def call(self, x):
-    return
-  
+    x = self.wrap(x)
+    x = self.blocks(x)
+    return x
+    
   def wrap(self, x):
-    return
+    return self.stn(x)
   
   def build_encoder(self):
     nce_layers = self.config['nce_layers']
