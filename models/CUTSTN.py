@@ -95,7 +95,7 @@ class STN(tf.keras.Model):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.localizer = build_localizer()
+        self.localizer = self.build_localizer()
         self.sampler = BilinearSampler()
         self.act = config['act']
         self.use_bias = config['use_bias']
@@ -191,7 +191,7 @@ class Generator(tf.keras.Model):
 
 class PatchSampler(tf.keras.Model):
     def __init__(self, config, **kwargs):
-        super(PatchSampleMLP, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.units = config['units']
         self.num_patches = config['num_patches']
         self.l2_norm = layers.Lambda(
