@@ -111,7 +111,6 @@ class STN(tf.keras.Model):
     def build_localizer(self):
         dim = self.config['base']
         blocks = tf.keras.Sequential([
-            layers.Input([None, None, 3]),
             Padding2D(3, pad_type='reflect'),
             ConvBlock(dim, 7, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act),
         ])
@@ -143,7 +142,7 @@ class Generator(tf.keras.Model):
 
         # build generator
         self.blocks = tf.keras.Sequential([
-            layers.Input([None, None, 6]),
+            layers.Input([None, None, 3]),
             Padding2D(3, pad_type='reflect'),
             ConvBlock(dim, 7, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act),
         ])
