@@ -122,7 +122,7 @@ class STN(tf.keras.Model):
     self.blocks.add(LinearBlock(self.config['max_filters']), activation = self.act)
     self.blocks.add(layers.Dense(layers.Dense(
         units=6,   
-        bias_initializer=initializers.constant([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
+        bias_initializer=initializers.constant([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]), #initialize as A = [I, t]
         kernel_initializer='zeros')))
     self.blocks.add(layers.Reshape((2, 3)))
     return blocks
