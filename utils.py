@@ -37,16 +37,22 @@ def build_tf_dataset(source_list, target_list, opt):
   ds = tf.data.Dataset.zip((ds_source, ds_target)).shuffle(256).batch(opt.batch_size, drop_remainder=True).prefetch(AUTOTUNE)
   return ds
   
+
 def build_dataset(opt):
-  source_list = list(map(lambda x: f'{opt.source_dir}/{x}' , os.listdir(opt.source_dir)))
-  target_list = list(map(lambda x: f'{opt.target_dir}/{x}' , os.listdir(opt.target_dir)))
-  
-  source_train, source_val, target_train, target_val = ttp(source_list, target_list , test_size = opt.val_size, random_state =999, shuffle=True)
-  
-  ds_train = build_tf_dataset(source_train, target_train, opt)
-  ds_val = build_tf_dataset(source_val, target_val, opt)
-  
-  return ds_train, ds_val
+    source_list = list(map(lambda x: f'{opt.source_dir}/{x}', os.listdir(opt.source_dir)))
+    target_list = list(map(lambda x: f'{opt.target_dir}/{x}', os.listdir(opt.target_dir)))
+    length = min(len(source_list), len(target_list))
+    source_list = source_list[:length]
+    target_list = target_list[:length]
+
+    source_train, source_val, target_train, target_val = ttp(source_list, target_list, test_size=opt.val_size,
+                                                             random_state=999, shuffle=True)
+
+    ds_train = build_tf_dataset(source_train, target_train, opt)
+    ds_val = build_tf_dataset(source_val, target_val, opt)
+
+    return ds_train, ds_val
+
 
 
 ###Callbacks
