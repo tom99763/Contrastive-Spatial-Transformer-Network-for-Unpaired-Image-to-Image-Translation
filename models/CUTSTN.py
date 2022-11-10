@@ -239,7 +239,7 @@ class CUTSTN(tf.keras.Model):
         self.G_optimizer = G_optimizer
         self.F_optimizer = F_optimizer
         self.D_optimizer = D_optimizer
-        self.nce_loss_func = PatchNCELoss(self.tau)
+        self.nce_loss_func = PatchNCELoss(self.config['tau'])
 
     @tf.function
     def train_step(self, inputs):
