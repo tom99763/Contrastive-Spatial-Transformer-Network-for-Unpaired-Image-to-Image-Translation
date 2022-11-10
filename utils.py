@@ -69,7 +69,7 @@ class VisualizeCallback(callbacks.Callback):
         
         
         if self.opt.model == 'CUTSTN':
-            z = tf.random.normal(self.source.shape)
+            z = tf.random.normal((b, 3))
             x2y = self.model.G([self.source, z])
             source_wrapped = self.model.wrap(self.source)
         else:
