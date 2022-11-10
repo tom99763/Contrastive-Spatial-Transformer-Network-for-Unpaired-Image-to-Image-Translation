@@ -163,15 +163,8 @@ class Generator(tf.keras.Model):
         self.blocks.add(Padding2D(3, pad_type='reflect'))
         self.blocks.add(ConvBlock(3, 7, padding='valid', activation='tanh'))
 
-        # set config
-        self.config = config
-        
-        # build encoder
-        self.E = self.build_encoder()
-
         # build spatial transformer
         self.stn = STN(config)
-
 
     def call(self, x):
         x = self.wrap(x)
@@ -181,14 +174,14 @@ class Generator(tf.keras.Model):
     def wrap(self, x):
         return self.stn(x)
 
-    def build_encoder(self):
-        nce_layers = self.config['nce_layers']
-        outputs = []
-        for idx in nce_layers:
-            outputs.append(self.blocks.layers[idx].output)
-        return tf.keras.Model(inputs=self.input, outputs=outputs, name = 'encoder')
-
-
+def Encoder(generator, config):
+  nce_layers = config['nce_layers']
+  outputs = []
+  for idx in nce_layers:
+    outputs.append(generator.layers[idx].output)
+  return tf.keras.Model(inputs=generator.input, outputs=outputs, name='encoder')
+    
+    
 class PatchSampler(tf.keras.Model):
     def __init__(self, config, **kwargs):
         super().__init__(**kwargs)
@@ -232,6 +225,7 @@ class CUTSTN(tf.keras.Model):
         super().__init__()
         self.G = Generator(config)
         self.D = Discriminator(config)
+        self.E = Encoder(self.G.blocks, config)
         self.F = PatchSampler(config)
         self.config = config
 
@@ -264,11 +258,11 @@ class CUTSTN(tf.keras.Model):
             d_loss, g_loss_ = gan_loss(critic_real, critic_fake, self.gan_mode)
             
             if self.config['use_identity']:
-                nce_idt = self.nce_loss_func(xb, xbb, self.G.E, self.F)
+                nce_idt = self.nce_loss_func(xb, xbb, self.E, self.F)
             else:
                 nce_idt = 0.
             
-            nce_loss = self.nce_loss_func(la, xab, self.G.E, self.F) + nce_idt
+            nce_loss = self.nce_loss_func(la, xab, self.E, self.F) + nce_idt
                        
             g_loss = g_loss_ + 0.5 * self.config['lambda_nce'] * nce_loss
 
@@ -291,10 +285,10 @@ class CUTSTN(tf.keras.Model):
         
         if self.config['use_identity']:
             xbb = self.G(xb)
-            nce_idt = self.nce_loss_func(xb, xbb, self.G.E, self.F)
+            nce_idt = self.nce_loss_func(xb, xbb, self.E, self.F)
         else:
             nce_idt = 0.
             
-        nce_loss = self.nce_loss_func(la, xab, self.G.E, self.F) + nce_idt
+        nce_loss = self.nce_loss_func(la, xab, self.E, self.F) + nce_idt
         return {'nce': nce_loss}
 
