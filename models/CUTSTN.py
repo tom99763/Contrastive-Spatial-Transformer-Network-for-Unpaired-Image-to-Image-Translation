@@ -163,14 +163,15 @@ class Generator(tf.keras.Model):
         self.blocks.add(Padding2D(3, pad_type='reflect'))
         self.blocks.add(ConvBlock(3, 7, padding='valid', activation='tanh'))
 
+        # set config
+        self.config = config
+        
         # build encoder
         self.E = self.build_encoder()
 
         # build spatial transformer
         self.stn = STN(config)
 
-        # set config
-        self.config = config
 
     def call(self, x):
         x = self.wrap(x)
