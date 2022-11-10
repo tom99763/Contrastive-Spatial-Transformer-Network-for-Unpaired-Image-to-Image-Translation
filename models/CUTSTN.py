@@ -6,8 +6,12 @@ from discriminators import *
 class STN(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
+    self.localizer = build_localizer()
 
   def call(self, x):
+    pass
+  
+  def build_localizer(self):
     pass
 
 class Generator(tf.keras.Model):
