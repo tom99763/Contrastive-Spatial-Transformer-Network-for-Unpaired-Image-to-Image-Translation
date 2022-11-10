@@ -257,7 +257,7 @@ class CUTSTN(tf.keras.Model):
             critic_real = self.D(xb, training=True)
 
             ###compute losses
-            d_loss, g_loss_ = gan_loss(critic_real, critic_fake, self.gan_mode)
+            d_loss, g_loss_ = gan_loss(critic_real, critic_fake, self.config['gan_mode'])
 
             if self.config['use_identity']:
                 nce_idt = self.nce_loss_func(xb, xbb, self.E, self.F)
