@@ -2,7 +2,7 @@ import tensorflow as tf
 from losses import *
 from modules import *
 from discriminators import *
-from tensorflow.keras import initializers, preprocessing
+from tensorflow.keras import initializers, layers
 
 class BilinearSampler(layers.Layer):
     def __init__(self):
@@ -97,6 +97,9 @@ class STN(tf.keras.Model):
     self.config = config
     self.localizer = build_localizer()
     self.sampler = BilinearSampler()
+    self.act = config['act']
+    self.use_bias = config['use_bias']
+    self.norm = config['norm']
 
   def call(self, x):
     theta = self.localizer(x) #(b, 2, 3)
@@ -104,7 +107,24 @@ class STN(tf.keras.Model):
     return x
   
   def build_localizer(self):
-    return 
+    dim = self.config['base']
+    blocks = tf.keras.Sequential([
+        layers.Input([None, None, 3])
+        Padding2D(3, pad_type='reflect'),
+        ConvBlock(dim, 7, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act),
+    ])
+    
+    for _ in range(4):
+        dim = dim  * 2
+        self.blocks.add(ConvBlock(dim, 3, strides=2, padding='same',
+                                use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
+    self.blocks.add(layers.Flatten())
+    self.blocks.add(LinearBlock(self.config['max_filters']), activation = self.act)
+    self.blocks.add(layers.Dense(layers.Dense(
+        units=6,   
+        bias_initializer=initializers.constant([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
+        kernel_initializer='zeros')))
+    return blocks
 
   
 class Generator(tf.keras.Model):
@@ -126,7 +146,8 @@ class Generator(tf.keras.Model):
     
     for _ in range(self.num_downsampls):
       dim = dim  * 2
-      self.blocks.add(ConvBlock(dim, 3, strides=2, padding='same', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
+      self.blocks.add(ConvBlock(dim, 3, strides=2, padding='same',
+                                use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
       
     for _ in range(self.num_resblocks):
       self.blocks.add(ResBlock(dim, 3, self.use_bias, self.norm))
