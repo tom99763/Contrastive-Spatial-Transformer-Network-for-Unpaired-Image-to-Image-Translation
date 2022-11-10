@@ -140,7 +140,7 @@ class Generator(tf.keras.Model):
     
     #build generator
     self.blocks = tf.keras.Sequential([
-      layers.Input([None, None, 3])
+      layers.Input([None, None, 6])
       Padding2D(3, pad_type='reflect'),
       ConvBlock(dim, 7, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act),
     ])
@@ -167,14 +167,18 @@ class Generator(tf.keras.Model):
     
     #set config
     self.config=config
-  def call(self, x):
+    self.scale = self.add_weight(shape=(1,), initializer = initializers.Constant(0.1), trainable=True)
+    
+  def call(self, inputs):
+    x, z = inputs
     x = self.wrap(x)
+    x = tf.concat([x, self.scale * z], axis=-1)
     x = self.blocks(x)
     return x
     
   def wrap(self, x):
     return self.stn(x)
-  
+    
   def build_encoder(self):
     nce_layers = self.config['nce_layers']
     outputs = []
@@ -242,7 +246,8 @@ class CUTSTN(tf.keras.Model):
     
     with tf.GradientTape(persistent=True) as tape:
       #synthesize texture
-      xab = self.G(la)
+      z = tf.random.normal(la.shape)
+      xab = self.G([la, z])
       
       #discrimination
       critic_fake = self.D(xab, training=True)
@@ -268,7 +273,8 @@ class CUTSTN(tf.keras.Model):
   @tf.function
   def test_step(self, inputs):
     la, xb = inputs
-    xab = self.G(la) 
+    z = tf.random.normal(la.shape)
+    xab = self.G([la, z]) 
     nce_loss = self.nce_loss_func(la, xab, self.G.E, self.F)
     return {'nce': nce_loss}
   
