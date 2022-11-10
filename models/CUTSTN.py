@@ -97,11 +97,11 @@ class STN(tf.keras.Model):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.localizer = self.build_localizer()
-        self.sampler = BilinearSampler()
         self.act = config['act']
         self.use_bias = config['use_bias']
         self.norm = config['norm']
+        self.localizer = self.build_localizer()
+        self.sampler = BilinearSampler()
 
     def call(self, x):
         theta = self.localizer(x)  # (b, 2, 3)
