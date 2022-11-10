@@ -291,8 +291,6 @@ class CUTSTN(tf.keras.Model):
         
         if self.config['use_identity']:
             xbb = self.G(xb)
-        
-        if self.config['use_identity']:
             nce_idt = self.nce_loss_func(xb, xbb, self.G.E, self.F)
         else:
             nce_idt = 0.
