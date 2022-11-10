@@ -298,5 +298,5 @@ class CUTSTN(tf.keras.Model):
             nce_idt = 0.
             
         nce_loss = self.nce_loss_func(la, xab, self.G.E, self.F) + nce_idt
-        return {'nce': 0.5 * nce_loss}
+        return {'nce': nce_loss}
 
