@@ -61,10 +61,13 @@ class VisualizeCallback(callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         b, h, w, c = self.target.shape
         
-        x2y = self.model.G(self.source)
         
         if opt.model == 'CUTSTN':
+            z = tf.random.normal(self.source.shape)
+            x2y = self.model.G([self.source, z])
             source_wrapped = self.model.wrap(self.source)
+        else:
+            x2y = self.model.G(self.source)
         
         fig, ax = plt.subplots(ncols = b, nrows = 3 if self.opt.model == 'CUTSTN' else 2, figsize = (8, 8))
         
