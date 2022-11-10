@@ -252,6 +252,9 @@ class CUTSTN(tf.keras.Model):
         with tf.GradientTape(persistent=True) as tape:
             # synthesize texture
             xab = self.G(la)
+            
+            if self.config['use_identity']:
+                xbb = self.G(xb)
 
             # discrimination
             critic_fake = self.D(xab, training=True)
@@ -259,8 +262,15 @@ class CUTSTN(tf.keras.Model):
 
             ###compute losses
             d_loss, g_loss_ = gan_loss(critic_real, critic_fake, self.gan_mode)
-            nce_loss = self.nce_loss_func(la, xab, self.G.E, self.F)
-            g_loss = g_loss_ + self.config['lambda_nce'] * nce_loss
+            
+            if self.config['use_identity']:
+                nce_idt = self.nce_loss_func(xb, xbb, self.G.E, self.F)
+            else:
+                nce_idt = 0.
+            
+            nce_loss = self.nce_loss_func(la, xab, self.G.E, self.F) + nce_idt
+                       
+            g_loss = g_loss_ + 0.5 * self.config['lambda_nce'] * nce_loss
 
         G_grads = tape.gradient(g_loss, self.G.trainable_weights)
         D_grads = tape.gradient(d_loss, self.D.trainable_weights)
@@ -278,6 +288,15 @@ class CUTSTN(tf.keras.Model):
     def test_step(self, inputs):
         la, xb = inputs
         xab = self.G(la)
-        nce_loss = self.nce_loss_func(la, xab, self.G.E, self.F)
-        return {'nce': nce_loss}
+        
+        if self.config['use_identity']:
+            xbb = self.G(xb)
+        
+        if self.config['use_identity']:
+            nce_idt = self.nce_loss_func(xb, xbb, self.G.E, self.F)
+        else:
+            nce_idt = 0.
+            
+        nce_loss = self.nce_loss_func(la, xab, self.G.E, self.F) + nce_idt
+        return {'nce': 0.5 * nce_loss}
 
