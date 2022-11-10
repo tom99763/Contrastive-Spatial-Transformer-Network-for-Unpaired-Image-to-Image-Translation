@@ -1,7 +1,7 @@
 import os
 import tensorflow as tf
 from sklearn.model_selection import train_test_split as ttp
-from models import CUT
+from models import CUT, CUTSTN
 from tensorflow.keras import callbacks
 import matplotlib.pyplot as plt
 import yaml
@@ -13,6 +13,10 @@ def load_model(opt):
     if opt.model == 'CUT':
         model = CUT.CUT(config)
         params = f"{config['tau']}_{config['lambda_nce']}_{config['use_identity']}"
+        
+    elif opt.model == 'CUTSTN':
+        model = CUTSTN.CUTSTN(config)
+        params = f"{config['tau']}_{config['lambda_nce']}"
     return model, params
      
 
@@ -56,16 +60,26 @@ class VisualizeCallback(callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         b, h, w, c = self.target.shape
+        
         x2y = self.model.G(self.source)
         
-        fig, ax = plt.subplots(ncols = b, nrows = 2, figsize = (8, 8))
+        if opt.model == 'CUTSTN':
+            source_wrapped = self.model.wrap(self.source)
+        
+        fig, ax = plt.subplots(ncols = b, nrows = 3 if self.opt.model == 'CUTSTN' else 2, figsize = (8, 8))
         
         for i in range(b):
             ax[0, i].imshow(self.source[i] * 0.5 + 0.5)
             ax[0, i].axis('off')
-            ax[1, i].imshow(x2y[i] * 0.5 + 0.5)
-            ax[1, i].axis('off')
             
+            if opt.model == 'CUTSTN':
+                ax[1, i].imshow(source_wrapped[i] * 0.5 + 0.5)
+                ax[1, i].axis('off')
+                ax[2, i].imshow(x2y[i] * 0.5 + 0.5)
+                ax[2, i].axis('off')
+            else:
+                ax[1, i].imshow(x2y[i] * 0.5 + 0.5)
+                ax[1, i].axis('off')
         plt.tight_layout()
         dir = f'{self.opt.output_dir}/{self.opt.model}/{self.params_}'
         if not os.path.exists(dir):
