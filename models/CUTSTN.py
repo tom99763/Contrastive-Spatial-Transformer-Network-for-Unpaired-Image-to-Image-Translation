@@ -1,5 +1,6 @@
 import tensorflow as tf
 import sys
+
 sys.path.append('./models')
 from losses import *
 from modules import *
@@ -118,10 +119,10 @@ class STN(tf.keras.Model):
         for _ in range(4):
             dim = min(dim * 2, self.config['max_filters'])
             blocks.add(ConvBlock(dim, 3, strides=2, padding='same',
-                                      use_bias=self.use_bias, norm_layer=self.norm))
+                                 use_bias=self.use_bias, norm_layer=self.norm))
             blocks.add(layers.LeakyReLU(0.2))
         blocks.add(layers.Flatten())
-        blocks.add(layers.Dense(self.config['max_filters']), activation=self.act)
+        blocks.add(layers.Dense(self.config['max_filters'], activation=self.act))
         blocks.add(layers.Dense(layers.Dense(
             units=6,
             bias_initializer=initializers.constant([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]),  # initialize as A = [I, t]
@@ -174,14 +175,15 @@ class Generator(tf.keras.Model):
     def wrap(self, x):
         return self.stn(x)
 
+
 def Encoder(generator, config):
-  nce_layers = config['nce_layers']
-  outputs = []
-  for idx in nce_layers:
-    outputs.append(generator.layers[idx].output)
-  return tf.keras.Model(inputs=generator.input, outputs=outputs, name='encoder')
-    
-    
+    nce_layers = config['nce_layers']
+    outputs = []
+    for idx in nce_layers:
+        outputs.append(generator.layers[idx].output)
+    return tf.keras.Model(inputs=generator.input, outputs=outputs, name='encoder')
+
+
 class PatchSampler(tf.keras.Model):
     def __init__(self, config, **kwargs):
         super().__init__(**kwargs)
@@ -246,7 +248,7 @@ class CUTSTN(tf.keras.Model):
         with tf.GradientTape(persistent=True) as tape:
             # synthesize texture
             xab = self.G(la)
-            
+
             if self.config['use_identity']:
                 xbb = self.G(xb)
 
@@ -256,14 +258,14 @@ class CUTSTN(tf.keras.Model):
 
             ###compute losses
             d_loss, g_loss_ = gan_loss(critic_real, critic_fake, self.gan_mode)
-            
+
             if self.config['use_identity']:
                 nce_idt = self.nce_loss_func(xb, xbb, self.E, self.F)
             else:
                 nce_idt = 0.
-            
+
             nce_loss = self.nce_loss_func(la, xab, self.E, self.F) + nce_idt
-                       
+
             g_loss = g_loss_ + 0.5 * self.config['lambda_nce'] * nce_loss
 
         G_grads = tape.gradient(g_loss, self.G.trainable_weights)
@@ -282,13 +284,13 @@ class CUTSTN(tf.keras.Model):
     def test_step(self, inputs):
         la, xb = inputs
         xab = self.G(la)
-        
+
         if self.config['use_identity']:
             xbb = self.G(xb)
             nce_idt = self.nce_loss_func(xb, xbb, self.E, self.F)
         else:
             nce_idt = 0.
-            
+
         nce_loss = self.nce_loss_func(la, xab, self.E, self.F) + nce_idt
         return {'nce': nce_loss}
 
