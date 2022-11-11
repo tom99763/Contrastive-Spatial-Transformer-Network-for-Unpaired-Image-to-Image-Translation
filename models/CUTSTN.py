@@ -265,11 +265,11 @@ class CUTSTN(tf.keras.Model):
             d_loss, g_loss_ = gan_loss(critic_real, critic_fake, self.config['gan_mode'])
 
             if self.config['use_identity']:
-                nce_idt = self.nce_loss_func(xb, xbb, self.E, self.F)
+                nce_idt = self.nce_loss_func(xb, xbb, self.E, self.F, tf.zeros_like(z))
             else:
                 nce_idt = 0.
 
-            nce_loss = self.nce_loss_func(la, xab, self.E, self.F) + nce_idt
+            nce_loss = self.nce_loss_func(la, xab, self.E, self.F, z) + nce_idt
 
             g_loss = g_loss_ + 0.5 * self.config['lambda_nce'] * nce_loss
 
@@ -293,10 +293,10 @@ class CUTSTN(tf.keras.Model):
 
         if self.config['use_identity']:
             xbb = self.G([xb, tf.zeros_like(z)])
-            nce_idt = self.nce_loss_func(xb, xbb, self.E, self.F)
+            nce_idt = self.nce_loss_func(xb, xbb, self.E, self.F, tf.zeros_like(z))
         else:
             nce_idt = 0.
 
-        nce_loss = self.nce_loss_func(la, xab, self.E, self.F) + nce_idt
+        nce_loss = self.nce_loss_func(la, xab, self.E, self.F, z) + nce_idt
         return {'nce': nce_loss}
 
