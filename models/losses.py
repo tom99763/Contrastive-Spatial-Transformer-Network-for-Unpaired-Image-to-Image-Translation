@@ -1,5 +1,11 @@
 import tensorflow as tf
 
+def l1_loss(x, y):
+  return tf.reduce_mean(tf.abs(x-y))
+
+def l2_loss(x, y):
+  return tf.reduce_mean((x- y)**2)
+
 def gan_loss(critic_real, critic_fake, gan_mode):
     if gan_mode == 'lsgan':
         d_loss = tf.reduce_mean((1-critic_real) ** 2 + critic_fake ** 2)
@@ -23,9 +29,13 @@ class PatchNCELoss:
                                         reduction=tf.keras.losses.Reduction.NONE,
                                         from_logits=True)
 
-    def __call__(self, source, target, netE, netF):
-        feat_source = netE(source, training=True)
-        feat_target = netE(target, training=True)
+    def __call__(self, source, target, netE, netF, z=None):
+        if z is not None:
+            feat_source = netE([source, z], training=True)
+            feat_target = netE([target, tf.zeros_like(z)], training=True)
+        else:
+            feat_source = netE(source, training=True)
+            feat_target = netE(target, training=True)
 
         feat_source_pool, sample_ids = netF(feat_source, patch_ids=None, training=True)
         feat_target_pool, _ = netF(feat_target, patch_ids=sample_ids, training=True)
