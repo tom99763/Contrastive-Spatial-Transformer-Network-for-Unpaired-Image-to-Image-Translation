@@ -26,17 +26,17 @@ def get_config(config):
         return yaml.load(stream, Loader=yaml.FullLoader)
 
 
-def get_image(pth, opt):
-    image = tf.image.decode_jpeg(tf.io.read_file(pth), channels=3)
+def get_image(pth, opt, channels = None):
+    image = tf.image.decode_jpeg(tf.io.read_file(pth), channels=channels)
     image = tf.cast(tf.image.resize(image, (opt.image_size, opt.image_size)), 'float32')
     return (image - 127.5) / 127.5
 
 
 def build_tf_dataset(source_list, target_list, opt):
-    ds_source = tf.data.Dataset.from_tensor_slices(source_list).map(lambda pth: get_image(pth, opt),
+    ds_source = tf.data.Dataset.from_tensor_slices(source_list).map(lambda pth: get_image(pth, opt, 1),
                                                                     num_parallel_calls=AUTOTUNE).shuffle(256).prefetch(
         AUTOTUNE)
-    ds_target = tf.data.Dataset.from_tensor_slices(target_list).map(lambda pth: get_image(pth, opt),
+    ds_target = tf.data.Dataset.from_tensor_slices(target_list).map(lambda pth: get_image(pth, opt, 3),
                                                                     num_parallel_calls=AUTOTUNE).shuffle(256).prefetch(
         AUTOTUNE)
     ds = tf.data.Dataset.zip((ds_source, ds_target)).shuffle(256).batch(opt.batch_size, drop_remainder=True).prefetch(
