@@ -269,7 +269,7 @@ class CUTSTN(tf.keras.Model):
             else:
                 nce_idt = 0.
 
-            nce_loss = self.nce_loss_func(la, xab, self.E, self.F, z) + nce_idt
+            nce_loss = self.nce_loss_func(la, xab, self.E, self.F, tf.zeros_like(z)) + nce_idt
 
             g_loss = g_loss_ + 0.5 * self.config['lambda_nce'] * nce_loss
 
@@ -297,6 +297,6 @@ class CUTSTN(tf.keras.Model):
         else:
             nce_idt = 0.
 
-        nce_loss = self.nce_loss_func(la, xab, self.E, self.F, z) + nce_idt
+        nce_loss = self.nce_loss_func(la, xab, self.E, self.F, tf.zeros_like(z)) + nce_idt
         return {'nce': nce_loss}
 
