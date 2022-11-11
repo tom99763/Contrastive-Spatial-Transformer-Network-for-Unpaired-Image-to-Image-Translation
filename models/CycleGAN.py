@@ -111,14 +111,14 @@ class STN(tf.keras.Model):
         return x
 
     def build_localizer(self):
-        dim = self.config['base']//4
+        dim = self.config['base']
         blocks = tf.keras.Sequential([
             Padding2D(3, pad_type='reflect'),
             ConvBlock(dim, 7, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act),
         ])
 
         for _ in range(4):
-            dim = min(dim * 2, self.config['max_filters']//4)
+            dim = min(dim * 2, self.config['max_filters'])
             blocks.add(ConvBlock(dim, 3, strides=2, padding='same',
                                  use_bias=self.use_bias, norm_layer=self.norm))
             blocks.add(layers.LeakyReLU(0.2))
@@ -170,7 +170,7 @@ class Generator(tf.keras.Model):
 
     def call(self, inputs):
         x_contour, x_style =inputs
-        x = self.wrap(x_contour, x_style)
+        x_contour = self.wrap(x_contour, x_style)
         x = self.blocks(tf.concat([x_contour, x_style], axis=-1))
         return x
 
@@ -280,5 +280,4 @@ class CUTSTN(tf.keras.Model):
         xab = self.G([la, xb])
         nce_loss = self.nce_loss_func(la, xab, self.E, self.F, xb)
         return {'nce': nce_loss}
-
 
