@@ -169,13 +169,9 @@ class Generator(tf.keras.Model):
         self.stn = STN(config)
 
     def call(self, inputs):
-        if len(inputs) == 1:
-            x = inputs
-            z = tf.zeros_like(x)
-        else:
-            x, z =inputs
-            z = z[:, None, None, :]
-            z = tf.repeat(tf.repeat(z, x.shape[1], axis=1), x.shape[2], axis=2)
+        x, z =inputs
+        z = z[:, None, None, :]
+        z = tf.repeat(tf.repeat(z, x.shape[1], axis=1), x.shape[2], axis=2)
         x = self.wrap(x, z)
         x = self.blocks(tf.concat([x, z], axis=-1))
         return x
@@ -259,7 +255,7 @@ class CUTSTN(tf.keras.Model):
             xab = self.G([la, z])
 
             if self.config['use_identity']:
-                xbb = self.G(xb)
+                xbb = self.G([xb, tf.zeros_like(z)])
 
             # discrimination
             critic_fake = self.D(xab, training=True)
@@ -296,7 +292,7 @@ class CUTSTN(tf.keras.Model):
         xab = self.G([la, z])
 
         if self.config['use_identity']:
-            xbb = self.G(xb)
+            xbb = self.G([xb, tf.zeros_like(z)])
             nce_idt = self.nce_loss_func(xb, xbb, self.E, self.F)
         else:
             nce_idt = 0.
