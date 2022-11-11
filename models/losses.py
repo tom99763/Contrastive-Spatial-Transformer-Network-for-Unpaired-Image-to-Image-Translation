@@ -31,10 +31,8 @@ class PatchNCELoss:
 
     def __call__(self, source, target, netE, netF, z=None):
         if z is not None:
-            z = z[:, None, None, :]
-            z = tf.repeat(tf.repeat(z, source.shape[1], axis=1), source.shape[2], axis=2)
             feat_source = netE(tf.concat([source, z], axis=-1), training=True)
-            feat_target = netE(tf.concat([target, tf.zeros_like(z)], axis=-1), training=True)
+            feat_target = netE(tf.concat([source, target], axis=-1), training=True)
         else:
             feat_source = netE(source, training=True)
             feat_target = netE(target, training=True)
