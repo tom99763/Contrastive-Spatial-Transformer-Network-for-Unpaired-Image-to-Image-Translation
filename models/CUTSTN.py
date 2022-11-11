@@ -104,8 +104,9 @@ class STN(tf.keras.Model):
         self.localizer = self.build_localizer()
         self.sampler = BilinearSampler()
 
-    def call(self, x):
-        theta = self.localizer(x)  # (b, 2, 3)
+    def call(self, inputs):
+        x, z = inputs
+        theta = self.localizer(tf.concat([x, z], axis=-1))  # (b, 2, 3)
         x = self.sampler([x, theta])
         return x
 
@@ -143,7 +144,7 @@ class Generator(tf.keras.Model):
 
         # build generator
         self.blocks = tf.keras.Sequential([
-            layers.Input([None, None, 3]),
+            layers.Input([None, None, 6]),
             Padding2D(3, pad_type='reflect'),
             ConvBlock(dim, 7, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act),
         ])
@@ -167,13 +168,20 @@ class Generator(tf.keras.Model):
         # build spatial transformer
         self.stn = STN(config)
 
-    def call(self, x):
-        x = self.wrap(x)
-        x = self.blocks(x)
+    def call(self, inputs):
+        if len(inputs) == 1:
+            x = inputs
+            z = tf.zeros_like(x)
+        else:
+            x, z =inputs
+            z = z[:, None, None, :]
+            z = tf.repeat(tf.repeat(z, x.shape[1], axis=1), x.shape[2], axis=2)
+        x = self.wrap(x, z)
+        x = self.blocks(tf.concat([x, z], axis=-1))
         return x
 
-    def wrap(self, x):
-        return self.stn(x)
+    def wrap(self, x, z):
+        return self.stn([x, z])
 
 
 def Encoder(generator, config):
@@ -247,7 +255,8 @@ class CUTSTN(tf.keras.Model):
 
         with tf.GradientTape(persistent=True) as tape:
             # synthesize texture
-            xab = self.G(la)
+            z = tf.random.normal((la.shape[0], 3))
+            xab = self.G([la, z])
 
             if self.config['use_identity']:
                 xbb = self.G(xb)
@@ -283,7 +292,8 @@ class CUTSTN(tf.keras.Model):
     @tf.function
     def test_step(self, inputs):
         la, xb = inputs
-        xab = self.G(la)
+        z = tf.random.normal((la.shape[0], 3))
+        xab = self.G([la, z])
 
         if self.config['use_identity']:
             xbb = self.G(xb)
