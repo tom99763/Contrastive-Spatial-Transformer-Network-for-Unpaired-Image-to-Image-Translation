@@ -21,7 +21,7 @@ class MetricsCallbacks(callbacks.Callback):
         self.FID = []
 
     def on_train_end(self, logs=None):
-        df = pd.Dataframe(self.FID, columns = ['fid'])
+        df = pd.DataFrame(self.FID, columns = ['fid'])
         df.to_csv(f'{self.opt.output_dir}/{self.opt.model}/{self.params}_score.csv')
 
     def on_epoch_end(self, epoch, logs=None):
