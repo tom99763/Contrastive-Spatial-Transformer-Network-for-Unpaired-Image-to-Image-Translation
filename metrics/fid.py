@@ -1,5 +1,5 @@
 import numpy as np
-
+from scipy.linalg import sqrtm
 
 def calculate_fid(Eb, Eab):
     # calculate mean and covariance statistics
