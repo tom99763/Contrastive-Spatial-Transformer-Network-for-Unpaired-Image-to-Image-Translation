@@ -1,20 +1,23 @@
 import tensorflow as tf
 
+
 def l1_loss(x, y):
-  return tf.reduce_mean(tf.abs(x-y))
+    return tf.reduce_mean(tf.abs(x - y))
+
 
 def l2_loss(x, y):
-  return tf.reduce_mean((x- y)**2)
+    return tf.reduce_mean((x - y) ** 2)
+
 
 def gan_loss(critic_real, critic_fake, gan_mode):
     if gan_mode == 'lsgan':
-        d_loss = tf.reduce_mean((1-critic_real) ** 2 + critic_fake ** 2)
-        g_loss = tf.reduce_mean((1-critic_fake) ** 2)
-        
+        d_loss = tf.reduce_mean((1 - critic_real) ** 2 + critic_fake ** 2)
+        g_loss = tf.reduce_mean((1 - critic_fake) ** 2)
+
     elif gan_mode == 'nonsaturate':
         d_loss = tf.reduce_mean(tf.math.softplus(-critic_real) + tf.math.softplus(critic_fake))
         g_loss = tf.reduce_mean(tf.math.softplus(-critic_fake))
-        
+
     elif gan_mode == 'wgangp':
         d_loss = tf.reduce_mean(-critic_real + critic_fake)
         g_loss = tf.reduce_mean(-critic_fake)
@@ -26,16 +29,12 @@ class PatchNCELoss:
         # Potential: only supports for batch_size=1 now.
         self.tau = tau
         self.cross_entropy_loss = tf.keras.losses.CategoricalCrossentropy(
-                                        reduction=tf.keras.losses.Reduction.NONE,
-                                        from_logits=True)
+            reduction=tf.keras.losses.Reduction.NONE,
+            from_logits=True)
 
-    def __call__(self, source, target, netE, netF, z=None):
-        if z is not None:
-            feat_source = netE(tf.concat([source, z], axis=-1), training=True)
-            feat_target = netE(tf.concat([source, target], axis=-1), training=True)
-        else:
-            feat_source = netE(source, training=True)
-            feat_target = netE(target, training=True)
+    def __call__(self, source, target, netE, netF):
+        feat_source = netE(source, training=True)
+        feat_target = netE(target, training=True)
 
         feat_source_pool, sample_ids = netF(feat_source, patch_ids=None, training=True)
         feat_target_pool, _ = netF(feat_target, patch_ids=sample_ids, training=True)
