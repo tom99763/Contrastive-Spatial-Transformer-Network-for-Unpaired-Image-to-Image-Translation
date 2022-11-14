@@ -11,7 +11,7 @@ class MetricsCallbacks(callbacks.Callback):
         super().__init__()
         self.validation_data = val_data
         self.opt=opt
-        self.params = params
+        self.params_ = params
         self.inception_model = InceptionV3(include_top=False,
                                            weights="imagenet",
                                            pooling='avg')
@@ -22,7 +22,7 @@ class MetricsCallbacks(callbacks.Callback):
 
     def on_train_end(self, logs=None):
         df = pd.DataFrame(self.FID, columns = ['fid'])
-        df.to_csv(f'{self.opt.output_dir}/{self.opt.model}/{self.params}_score.csv')
+        df.to_csv(f'{self.opt.output_dir}/{self.opt.model}/{self.params_}_score.csv')
 
     def on_epoch_end(self, epoch, logs=None):
         Eb = []
