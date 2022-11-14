@@ -1,4 +1,6 @@
 import tensorflow as tf
+import sys
+sys.path.append('./models')
 from losses import *
 from modules import *
 from discriminators import *
@@ -15,9 +17,9 @@ class Generator(tf.keras.Model):
     dim = config['base']
     
     self.blocks = tf.keras.Sequential([
-      layers.Input([None, None, 3])
-      Padding2D(3, pad_type='reflect'),
-      ConvBlock(dim, 7, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act),
+        layers.Input([None, None, 3]),
+        Padding2D(3, pad_type='reflect'),
+        ConvBlock(dim, 7, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act),
     ])
     
     for _ in range(self.num_downsampls):
@@ -29,7 +31,8 @@ class Generator(tf.keras.Model):
       
     for _ in range(self.num_downsampls):
       dim  = dim / 2
-      self.blocks.add(ConvTransposeBlock(dim, 3, strides=2, padding='same', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
+      self.blocks.add(ConvTransposeBlock(dim, 3, strides=2, padding='same',
+                                         use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
     self.blocks.add(Padding2D(3, pad_type='reflect'))
     self.blocks.add(ConvBlock(3, 7, padding='valid', activation='tanh'))
     
@@ -38,11 +41,11 @@ class Generator(tf.keras.Model):
   
   
 def Encoder(generator, config):
-  nce_layers = config['nce_layers']
-  outputs = []
-  for idx in nce_layers:
-    outputs.append(generator.layers[idx].output)
-  return tf.keras.Model(inputs=generator.input, outputs=outputs, name='encoder')
+    nce_layers = config['nce_layers']
+    outputs = []
+    for idx in nce_layers:
+        outputs.append(generator.layers[idx].output)
+    return tf.keras.Model(inputs=generator.input, outputs=outputs, name='encoder')
 
   
 class PatchSampleMLP(tf.keras.Model):
@@ -85,7 +88,6 @@ class PatchSampleMLP(tf.keras.Model):
 class CUT(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
-    
     self.G = Generator(config)
     self.D = Discriminator(config)
     self.E = Encoder(self.G.blocks, config)
@@ -127,8 +129,8 @@ class CUT(tf.keras.Model):
       nce_loss = self.nce_loss_func(source, x2y, self.E, self.F)
       
       if self.use_identity:
-        nce_idt_loss = self.nce_loss_func(target, y_idt, self.E, self.F)
-        nce_loss = (nce_loss + nce_idt_loss) * 0.5
+          nce_idt_loss = self.nce_loss_func(target, y_idt, self.E, self.F)
+          nce_loss = (nce_loss + nce_idt_loss) * 0.5
         
       g_loss = g_loss_ + self.lambda_nce * nce_loss
       
