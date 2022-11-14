@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 def learned_patch_relation(x, E, target_id):
   feature_maps = E(x)
-  fig, ax = plt.subplots()
+  fig, ax = plt.subplots(ncols = x.shape[0], nrows = 1 + len(feature_maps))
     
   
 def quantitive_visualize(x, model, opt, params):
