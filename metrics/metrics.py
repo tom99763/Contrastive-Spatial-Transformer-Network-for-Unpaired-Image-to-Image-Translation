@@ -1,6 +1,4 @@
 import tensorflow as tf
-import numpy as np
-from scipy.linalg import sqrtm
 from tensorflow.keras import callbacks
 from tensorflow.keras.applications.inception_v3 import InceptionV3, preprocess_input
 import pandas as pd
