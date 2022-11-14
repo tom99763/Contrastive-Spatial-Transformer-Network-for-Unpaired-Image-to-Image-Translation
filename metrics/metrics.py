@@ -33,10 +33,10 @@ class MetricsCallbacks(callbacks.Callback):
 
     def on_train_begin(self, logs=None):
         self.IS = []
-        self.FIS = []
+        self.FID = []
 
     def on_train_end(self, logs=None):
-        df = pd.DataFrame([self.IS, self.FIS], columns = ['is', 'fid'])
+        df = pd.DataFrame(np.array([self.IS, self.FID]).T, columns = ['is', 'fid'])
         df.to_csv(f'{self.opt.output_dir}/{self.opt.model}/{self.params_}_score.csv')
 
     def on_epoch_end(self, epoch, logs=None):
