@@ -1,10 +1,11 @@
 import os
 import tensorflow as tf
 from sklearn.model_selection import train_test_split as ttp
-from models import CUT, CUTSTN
+from models import CUT
 from tensorflow.keras import callbacks
 import matplotlib.pyplot as plt
 import yaml
+from metrics import metrics
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
@@ -14,10 +15,6 @@ def load_model(opt):
     if opt.model == 'CUT':
         model = CUT.CUT(config)
         params = f"{config['tau']}_{config['lambda_nce']}_{config['use_identity']}"
-
-    elif opt.model == 'CUTSTN':
-        model = CUTSTN.CUTSTN(config)
-        params = f"{config['tau']}_{config['lambda_nce']}"
     return model, params
 
 
@@ -26,17 +23,17 @@ def get_config(config):
         return yaml.load(stream, Loader=yaml.FullLoader)
 
 
-def get_image(pth, opt, channels = None):
+def get_image(pth, opt, channels = 3):
     image = tf.image.decode_jpeg(tf.io.read_file(pth), channels=channels)
     image = tf.cast(tf.image.resize(image, (opt.image_size, opt.image_size)), 'float32')
-    return (image - 127.5) / 127.5
+    return (image-127.5)/127.5
 
 
 def build_tf_dataset(source_list, target_list, opt):
-    ds_source = tf.data.Dataset.from_tensor_slices(source_list).map(lambda pth: get_image(pth, opt, 1),
+    ds_source = tf.data.Dataset.from_tensor_slices(source_list).map(lambda pth: get_image(pth, opt),
                                                                     num_parallel_calls=AUTOTUNE).shuffle(256).prefetch(
         AUTOTUNE)
-    ds_target = tf.data.Dataset.from_tensor_slices(target_list).map(lambda pth: get_image(pth, opt, 3),
+    ds_target = tf.data.Dataset.from_tensor_slices(target_list).map(lambda pth: get_image(pth, opt),
                                                                     num_parallel_calls=AUTOTUNE).shuffle(256).prefetch(
         AUTOTUNE)
     ds = tf.data.Dataset.zip((ds_source, ds_target)).shuffle(256).batch(opt.batch_size, drop_remainder=True).prefetch(
@@ -71,10 +68,9 @@ class VisualizeCallback(callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         b, h, w, c = self.target.shape
-        z = tf.random.normal((b, 3))
-        x2y = self.model.G([self.source, z])
+        x2y = self.model.G(self.source)
         if self.opt.model == 'CUTSTN':
-            source_wrapped = self.model.G.wrap(self.source, z)
+            source_wrapped = self.model.G.wrap(self.source)
 
         fig, ax = plt.subplots(ncols=b, nrows=3 if self.opt.model == 'CUTSTN' else 2, figsize=(8, 8))
 
@@ -97,7 +93,7 @@ class VisualizeCallback(callbacks.Callback):
         plt.savefig(f'{dir}/synthesis_{epoch}.jpg')
 
 
-def set_callbacks(opt, params, source, target):
+def set_callbacks(opt, params, source, target, val_ds = None):
     ckpt_dir = f"{opt.ckpt_dir}/{opt.model}"
     output_dir = f"{opt.output_dir}/{opt.model}"
 
@@ -110,4 +106,5 @@ def set_callbacks(opt, params, source, target):
     checkpoint_callback = callbacks.ModelCheckpoint(filepath=f"{ckpt_dir}/{params}/{opt.model}", save_weights_only=True)
     history_callback = callbacks.CSVLogger(f"{output_dir}/{params}.csv", separator=",", append=False)
     visualize_callback = VisualizeCallback(source, target, opt, params)
-    return [checkpoint_callback, history_callback, visualize_callback]
+    metrics_callback = metrics.MetricsCallbacks(val_ds, opt, params)
+    return [checkpoint_callback, history_callback, visualize_callback, metrics_callback]
