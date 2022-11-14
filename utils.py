@@ -5,7 +5,7 @@ from models import CUT
 from tensorflow.keras import callbacks
 import matplotlib.pyplot as plt
 import yaml
-from metrics import metrics
+from experiments import metrics
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
