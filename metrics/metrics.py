@@ -3,8 +3,26 @@ from tensorflow.keras import callbacks
 from tensorflow.keras.applications.inception_v3 import InceptionV3, preprocess_input
 import pandas as pd
 import sys
-sys.path.append('./metrics')
-from fid import calculate_fid
+import numpy as np
+from scipy.linalg import sqrtm
+
+def calculate_fid(Eb, Eab):
+    # calculate mean and covariance statistics
+    mu1, sigma1 = Eb.mean(axis=0), np.cov(Eb, rowvar=False)
+    mu2, sigma2 = Eab.mean(axis=0), np.cov(Eab, rowvar=False)
+
+    # calculate sum squared difference between means
+    ssdiff = np.sum((mu1 - mu2) ** 2.0)
+
+    # calculate sqrt of product between cov
+    covmean = sqrtm(sigma1.dot(sigma2))
+
+    # check and correct imaginary numbers from sqrt
+    if np.iscomplexobj(covmean):
+        covmean = covmean.real
+    # calculate score
+    fid = ssdiff + np.trace(sigma1 + sigma2 - 2.0 * covmean)
+    return 
 
 class MetricsCallbacks(callbacks.Callback):
     def __init__(self, val_data, opt, params):
