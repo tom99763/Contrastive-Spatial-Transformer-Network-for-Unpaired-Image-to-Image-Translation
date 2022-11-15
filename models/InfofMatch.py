@@ -35,7 +35,9 @@ class CoordPredictor(tf.keras.Model):
     
   def call(self, inputs):
     x = tf.concat(inputs, axis=-1)
-    return self.blocks(x)
+    x = self.blocks(x)
+    x = x/10.
+    return x
  
 
 class Encoder(tf.keras.Model):
