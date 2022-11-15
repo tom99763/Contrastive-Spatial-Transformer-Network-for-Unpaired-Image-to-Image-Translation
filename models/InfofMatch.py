@@ -135,7 +135,7 @@ def get_pixel_value(img, x, y):
 
 
 def bilinear_sampler(img, grids):
-    x, y = grids[:, 0, ...], grids[:, 1, ....]
+    x, y = grids[:, 0, ...], grids[:, 1, ...]
     H = tf.shape(img)[1]
     W = tf.shape(img)[2]
     max_y = tf.cast(H - 1, 'int32')
