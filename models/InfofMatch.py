@@ -31,7 +31,7 @@ class CoordPredictor(tf.keras.Model):
       self.blocks.add(ConvTransposeBlock(dim, 3, strides=2, padding='same',
                                          use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
     self.blocks.add(Padding2D(3, pad_type='reflect'))
-    self.blocks.add(ConvBlock(2, 7, padding='valid', activation='tanh'))
+    self.blocks.add(ConvBlock(2, 7, padding='valid'))
     
   def call(self, inputs):
     x = tf.concat(inputs, axis=-1)
