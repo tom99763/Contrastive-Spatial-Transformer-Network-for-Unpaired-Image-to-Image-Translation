@@ -38,7 +38,9 @@ class CoordPredictor(tf.keras.Model):
     x = tf.concat(inputs, axis=-1)
     x = self.blocks(x)
     x = x/10.
-    return x
+    grids = affine_grid_generator(x.shape[1], x.shape[2], x.shape[0]) + x
+    x = bilinear_sampler(x, grids)
+    return x, grids
  
 
 class Encoder(tf.keras.Model):
@@ -201,8 +203,7 @@ class InfoMatch(tf.keras.Model):
     xa, xb = inputs
     
     with tf.GradientTape(persistent=True) as tape:
-      coord = self.CP([xa, xb])
-      xa_wrapped = tfa.image.resampler(xa, coord)
+      xa_wrapped, grids = self.CP([xa, xb])
       l_info = self.PatchInfoNCE(xb, xa_wrapped, self.E, self.F)
       
     grads = tape.gradient(l_info, self.CP.trainable_weights + self.F.trainable_weights)
@@ -213,7 +214,6 @@ class InfoMatch(tf.keras.Model):
   @tf.function
   def test_step(self, inputs):
     xa, xb = inputs
-    coord = self.CP([xa, xb])
-    xa_wrapped = tfa.image.resampler(xa, coord)
+    xa_wrapped, grids = self.CP([xa, xb])
     l_info = self.PatchInfoNCE(xb, xa_wrapped, self.E, self.F)
     return {'infonce':l_info}
