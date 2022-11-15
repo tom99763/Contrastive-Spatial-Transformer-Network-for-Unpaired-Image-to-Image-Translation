@@ -64,7 +64,7 @@ class PatchSampler:
 
 
 
-class InfoMatchNet(tf.keras.Model):
+class InfoMatch(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
     self.CP
