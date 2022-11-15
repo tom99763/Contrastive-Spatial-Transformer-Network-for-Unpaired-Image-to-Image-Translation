@@ -2,6 +2,7 @@ import sys
 sys.path.append('./models')
 from modules import *
 from losses import *
+import tensorflow_addons as tfa
 from tensorflow.keras.applications.vgg16 import VGG16
 
 class CoordPredictor(tf.keras.Model):
@@ -54,10 +55,6 @@ class Encoder(tf.keras.Model):
     vgg.trainable=False
     outputs = [vgg.layers[idx].output for idx in self.nce_layers]
     return tf.keras.Model(inputs=vgg.input, outputs=outputs)
-  
-
-class GridSampler:
-  pass
 
 
 
@@ -106,7 +103,6 @@ class InfoMatch(tf.keras.Model):
     self.CP = CoordPredictor(config)
     self.E = Encoder()
     self.F = PatchSampler(config)
-    self.GS = GridSampler(config)
     
   @tf.function
   def train_step(self, inputs):
@@ -114,7 +110,7 @@ class InfoMatch(tf.keras.Model):
     
     with tf.GradientTape(persistent=True) as tape:
       coord = self.CP([xa, xb])
-      xa_wrapped = self.GS([xa, coord])
+      xa_wrapped = tfa.image.resampler(xa, coord)
       l_info = self.PatchInfoNCE(xb, xa_wrapped, self.E, self.F)
       
     grads = tape.gradient(l_info, self.CP.trainable_weights + self.F.trainable_weights)
@@ -126,6 +122,6 @@ class InfoMatch(tf.keras.Model):
   def test_step(self, inputs):
     xa, xb = inputs
     coord = self.CP([xa, xb])
-    xa_wrapped = self.GS([xa, coord])
+    xa_wrapped = tfa.image.resampler(xa, coord)
     l_info = self.PatchInfoNCE(xb, xa_wrapped, self.E, self.F)
     return {'infonce':l_info}
