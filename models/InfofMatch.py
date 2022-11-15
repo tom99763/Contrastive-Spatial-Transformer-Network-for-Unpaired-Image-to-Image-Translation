@@ -1,63 +1,71 @@
 import sys
+
 sys.path.append('./models')
 from modules import *
 from losses import *
-import tensorflow_addons as tfa
 from tensorflow.keras.applications.vgg16 import VGG16
+import tensorflow as tf
+from tensorflow.keras import layers
+
 
 class CoordPredictor(tf.keras.Model):
-  def __init__(self, config):
-    super().__init__()
-    self.act = config['act']
-    self.use_bias = config['use_bias']
-    self.norm = config['norm']
-    self.num_downsampls = config['num_downsamples']
-    self.num_resblocks = config['num_resblocks']
-    dim = config['base']
-    
-    self.blocks = tf.keras.Sequential([
-        Padding2D(3, pad_type='reflect'),
-        ConvBlock(dim, 7, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act),
-    ])
-    
-    for _ in range(self.num_downsampls):
-      dim = dim  * 2
-      self.blocks.add(ConvBlock(dim, 3, strides=2, padding='same', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
-      
-    for _ in range(self.num_resblocks):
-      self.blocks.add(ResBlock(dim, 3, self.use_bias, self.norm))
-      
-    for _ in range(self.num_downsampls):
-      dim  = dim / 2
-      self.blocks.add(ConvTransposeBlock(dim, 3, strides=2, padding='same',
-                                         use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
-    self.blocks.add(Padding2D(3, pad_type='reflect'))
-    self.blocks.add(ConvBlock(2, 7, padding='valid'))
-    
-  def call(self, inputs):
-    x = tf.concat(inputs, axis=-1)
-    x = self.blocks(x)
-    x = x/10.
-    grids = affine_grid_generator(x.shape[1], x.shape[2], x.shape[0]) + x
-    x = bilinear_sampler(x, grids)
-    return x, grids
- 
+    def __init__(self, config):
+        super().__init__()
+        self.act = config['act']
+        self.use_bias = config['use_bias']
+        self.norm = config['norm']
+        self.num_downsampls = config['num_downsamples']
+        self.num_resblocks = config['num_resblocks']
+        dim = config['base']
+
+        self.blocks = tf.keras.Sequential([
+            Padding2D(3, pad_type='reflect'),
+            ConvBlock(dim, 7, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=self.act),
+        ])
+
+        for _ in range(self.num_downsampls):
+            dim = dim * 2
+            self.blocks.add(ConvBlock(dim, 3, strides=2, padding='same', use_bias=self.use_bias, norm_layer=self.norm,
+                                      activation=self.act))
+
+        for _ in range(self.num_resblocks):
+            self.blocks.add(ResBlock(dim, 3, self.use_bias, self.norm))
+
+        for _ in range(self.num_downsampls):
+            dim = dim / 2
+            self.blocks.add(ConvTransposeBlock(dim, 3, strides=2, padding='same',
+                                               use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
+        self.blocks.add(Padding2D(3, pad_type='reflect'))
+        self.blocks.add(ConvBlock(2, 7, padding='valid'))
+
+    def call(self, inputs):
+        xa, xb = inputs
+        x = tf.concat([xa, xb], axis=-1)
+        grids_shift = self.blocks(x)
+        grids_shift = grids_shift / 10.
+        tv_loss =tf.image.total_variation(grids_shift) * x.shape[1]
+        self.add_loss(tv_loss)
+
+        grids = affine_grid_generator(x.shape[1], x.shape[2], x.shape[0]) +\
+                tf.transpose(grids_shift, perm=[0, 3, 1, 2])
+        xa = bilinear_sampler(xa, grids)
+        return xa, grids
+
 
 class Encoder(tf.keras.Model):
-  def __init__(self, config):
-    super().__init__()
-    self.nce_layers=config['nce_layers']
-    self.vgg = self.build_vgg()
-    
-  def call(self, x):
-    return self.vgg(x)
-  
-  def build_vgg(self):
-    vgg = VGG16(include_top=False)
-    vgg.trainable=False
-    outputs = [vgg.layers[idx].output for idx in self.nce_layers]
-    return tf.keras.Model(inputs=vgg.input, outputs=outputs)
+    def __init__(self, config):
+        super().__init__()
+        self.nce_layers = config['nce_layers']
+        self.vgg = self.build_vgg()
 
+    def call(self, x):
+        return self.vgg(x)
+
+    def build_vgg(self):
+        vgg = VGG16(include_top=False)
+        vgg.trainable = False
+        outputs = [vgg.layers[idx].output for idx in self.nce_layers]
+        return tf.keras.Model(inputs=vgg.input, outputs=outputs)
 
 
 class PatchSampler(tf.keras.Model):
@@ -65,16 +73,17 @@ class PatchSampler(tf.keras.Model):
         super().__init__(**kwargs)
         self.units = config['units']
         self.num_patches = config['num_patches']
-        self.l2_norm = layers.Lambda(lambda x: x * tf.math.rsqrt(tf.reduce_sum(tf.square(x), axis=-1, keepdims=True) + 1e-10))
+        self.l2_norm = layers.Lambda(
+            lambda x: x * tf.math.rsqrt(tf.reduce_sum(tf.square(x), axis=-1, keepdims=True) + 1e-10))
 
     def build(self, input_shape):
         initializer = tf.random_normal_initializer(0., 0.02)
         feats_shape = input_shape
         for feat_id in range(len(feats_shape)):
             mlp = tf.keras.models.Sequential([
-                    layers.Dense(self.units, activation="relu", kernel_initializer=initializer),
-                    layers.Dense(self.units, kernel_initializer=initializer),
-                ])
+                layers.Dense(self.units, activation="relu", kernel_initializer=initializer),
+                layers.Dense(self.units, kernel_initializer=initializer),
+            ])
             setattr(self, f'mlp_{feat_id}', mlp)
 
     def call(self, inputs, patch_ids=None, training=None):
@@ -95,6 +104,7 @@ class PatchSampler(tf.keras.Model):
             samples.append(x_sample)
             ids.append(patch_id)
         return samples, ids
+
 
 def affine_grid_generator(height, width, num_batch):
     theta = tf.concat([tf.repeat(tf.eye(2)[None, ...], num_batch, axis=0),
@@ -124,6 +134,7 @@ def affine_grid_generator(height, width, num_batch):
     batch_grids = tf.reshape(batch_grids, [num_batch, 2, height, width])
     return batch_grids
 
+
 def get_pixel_value(img, x, y):
     shape = tf.shape(x)
     batch_size = shape[0]
@@ -147,8 +158,8 @@ def bilinear_sampler(img, grids):
     # rescale x and y to [0, W-1/H-1]
     x = tf.cast(x, 'float32')
     y = tf.cast(y, 'float32')
-    x = 0.5 * ((x + 1.0) * tf.cast(max_x-1, 'float32'))
-    y = 0.5 * ((y + 1.0) * tf.cast(max_y-1, 'float32'))
+    x = 0.5 * ((x + 1.0) * tf.cast(max_x - 1, 'float32'))
+    y = 0.5 * ((y + 1.0) * tf.cast(max_y - 1, 'float32'))
 
     # grab 4 nearest corner points for each (x_i, y_i)
     x0 = tf.cast(tf.floor(x), 'int32')
@@ -175,10 +186,10 @@ def bilinear_sampler(img, grids):
     y1 = tf.cast(y1, 'float32')
 
     # calculate deltas
-    wa = (x1-x) * (y1-y)
-    wb = (x1-x) * (y-y0)
-    wc = (x-x0) * (y1-y)
-    wd = (x-x0) * (y-y0)
+    wa = (x1 - x) * (y1 - y)
+    wb = (x1 - x) * (y - y0)
+    wc = (x - x0) * (y1 - y)
+    wd = (x - x0) * (y - y0)
 
     # add dimension for addition
     wa = tf.expand_dims(wa, axis=3)
@@ -187,33 +198,48 @@ def bilinear_sampler(img, grids):
     wd = tf.expand_dims(wd, axis=3)
 
     # compute output
-    out = tf.add_n([wa*Ia, wb*Ib, wc*Ic, wd*Id])
+    out = tf.add_n([wa * Ia, wb * Ib, wc * Ic, wd * Id])
 
     return out
 
+
 class InfoMatch(tf.keras.Model):
-  def __init__(self, config):
-    super().__init__()
-    self.CP = CoordPredictor(config)
-    self.E = Encoder()
-    self.F = PatchSampler(config)
-    
-  @tf.function
-  def train_step(self, inputs):
-    xa, xb = inputs
-    
-    with tf.GradientTape(persistent=True) as tape:
-      xa_wrapped, grids = self.CP([xa, xb])
-      l_info = self.PatchInfoNCE(xb, xa_wrapped, self.E, self.F)
-      
-    grads = tape.gradient(l_info, self.CP.trainable_weights + self.F.trainable_weights)
-    self.optimizer.apply_gradients(zip(grads, self.G.trainable_weights + self.F.trainable_weights))
-    return {'infonce':l_info}
-      
-  
-  @tf.function
-  def test_step(self, inputs):
-    xa, xb = inputs
-    xa_wrapped, grids = self.CP([xa, xb])
-    l_info = self.PatchInfoNCE(xb, xa_wrapped, self.E, self.F)
-    return {'infonce':l_info}
+    def __init__(self, config):
+        super().__init__()
+        self.CP = CoordPredictor(config)
+        self.E = Encoder(config)
+        self.F = PatchSampler(config)
+        self.config=config
+
+    def compile(self,
+                G_optimizer,
+                F_optimizer,
+                D_optimizer):
+        super().compile()
+        self.G_optimizer = G_optimizer
+        self.F_optimizer = F_optimizer
+        self.D_optimizer = D_optimizer
+        self.nce_loss_func = PatchNCELoss(self.config['tau'])
+
+    @tf.function
+    def train_step(self, inputs):
+        xa, xb = inputs
+
+        with tf.GradientTape(persistent=True) as tape:
+            xa_wrapped, grids = self.CP([xa, xb])
+            l_info = self.nce_loss_func(xb, xa_wrapped, self.E, self.F)
+            l_tv = sum(self.CP.losses)
+
+            loss = l_info + 1e-1 * l_tv
+
+        grads = tape.gradient(loss, self.CP.trainable_weights + self.F.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.CP.trainable_weights + self.F.trainable_weights))
+        return {'infonce': l_info, 'total variation': l_tv}
+
+    @tf.function
+    def test_step(self, inputs):
+        xa, xb = inputs
+        xa_wrapped, grids = self.CP([xa, xb])
+        l_info = self.nce_loss_func(xb, xa_wrapped, self.E, self.F)
+        l_tv = sum(self.CP.losses)
+        return {'infonce': l_info, 'total variation': l_tv}
