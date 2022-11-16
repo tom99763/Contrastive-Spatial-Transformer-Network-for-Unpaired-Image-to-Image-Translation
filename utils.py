@@ -1,20 +1,23 @@
 import os
 import tensorflow as tf
 from sklearn.model_selection import train_test_split as ttp
-from models import CUT
+from models import CUT, InfoMatch
 from tensorflow.keras import callbacks
 import matplotlib.pyplot as plt
 import yaml
-from experiments import metrics
+from metrics import metrics
+import numpy as np
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
-
 
 def load_model(opt):
     config = get_config(f'./configs/{opt.model}.yaml')
     if opt.model == 'CUT':
         model = CUT.CUT(config)
         params = f"{config['tau']}_{config['lambda_nce']}_{config['use_identity']}"
+    elif opt.model == 'InfoMatch':
+        model = InfoMatch.InfoMatch(config)
+        params = f"{config['use_nce']}_{config['tau']}_{config['use_identity']}"
     return model, params
 
 
@@ -56,6 +59,77 @@ def build_dataset(opt):
 
     return ds_train, ds_val
 
+def makecolorwheel():
+    # Create a colorwheel for visualization
+    RY = 15
+    YG = 6
+    GC = 4
+    CB = 11
+    BM = 13
+    MR = 6
+
+    ncols = RY + YG + GC + CB + BM + MR
+
+    colorwheel = np.zeros((ncols, 3))
+
+    col = 0
+    # RY
+    colorwheel[0:RY, 0] = 1
+    colorwheel[0:RY, 1] = np.arange(0, 1, 1. / RY)
+    col += RY
+
+    # YG
+    colorwheel[col:col + YG, 0] = np.arange(1, 0, -1. / YG)
+    colorwheel[col:col + YG, 1] = 1
+    col += YG
+
+    # GC
+    colorwheel[col:col + GC, 1] = 1
+    colorwheel[col:col + GC, 2] = np.arange(0, 1, 1. / GC)
+    col += GC
+
+    # CB
+    colorwheel[col:col + CB, 1] = np.arange(1, 0, -1. / CB)
+    colorwheel[col:col + CB, 2] = 1
+    col += CB
+
+    # BM
+    colorwheel[col:col + BM, 2] = 1
+    colorwheel[col:col + BM, 0] = np.arange(0, 1, 1. / BM)
+    col += BM
+
+    # MR
+    colorwheel[col:col + MR, 2] = np.arange(1, 0, -1. / MR)
+    colorwheel[col:col + MR, 0] = 1
+
+    return colorwheel
+
+def viz_flow(u, v, logscale=True, scaledown=6, output=False):
+    colorwheel = makecolorwheel()
+    ncols = colorwheel.shape[0]
+    radius = np.sqrt(u ** 2 + v ** 2)
+    radius = radius / scaledown
+    rot = np.arctan2(-v, -u) / np.pi
+    fk = (rot + 1) / 2 * (ncols - 1)  # -1~1 maped to 0~ncols
+    k0 = fk.astype(np.uint8)  # 0, 1, 2, ..., ncols
+    k1 = k0 + 1
+    k1[k1 == ncols] = 0
+    f = fk - k0
+    ncolors = colorwheel.shape[1]
+    img = np.zeros(u.shape + (ncolors,))
+    for i in range(ncolors):
+        tmp = colorwheel[:, i]
+        col0 = tmp[k0]
+        col1 = tmp[k1]
+        col = (1 - f) * col0 + f * col1
+
+        idx = radius <= 1
+        # increase saturation with radius
+        col[idx] = 1 - radius[idx] * (1 - col[idx])
+        # out of range
+        col[~idx] *= 0.75
+        img[:, :, i] = np.floor(255 * col)
+    return img/255.
 
 ###Callbacks
 class VisualizeCallback(callbacks.Callback):
@@ -68,22 +142,30 @@ class VisualizeCallback(callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         b, h, w, c = self.target.shape
-        x2y = self.model.G(self.source)
-        if self.opt.model == 'CUTSTN':
-            source_wrapped = self.model.G.wrap(self.source)
 
-        fig, ax = plt.subplots(ncols=b, nrows=3 if self.opt.model == 'CUTSTN' else 2, figsize=(8, 8))
+        if self.opt.model == 'InfoMatch':
+            x2y, grids = self.model.CP([self.source, self.target])
+            grids = tf.transpose(grids, [0, 2, 3, 1])
+        else:
+            x2y = self.model.G(self.source)
+
+        fig, ax = plt.subplots(ncols=b, nrows=4 if self.opt.model == 'InfoMatch' else 2, figsize=(8, 8))
 
         for i in range(b):
-            ax[0, i].imshow(self.source[i] * 0.5 + 0.5)
-            ax[0, i].axis('off')
 
-            if self.opt.model == 'CUTSTN':
-                ax[1, i].imshow(source_wrapped[i] * 0.5 + 0.5)
+            if self.opt.model == 'InfoMatch':
+                ax[0, i].imshow(self.source[i] * 0.5 + 0.5)
+                ax[0, i].axis('off')
+                ax[1, i].imshow(self.target[i] * 0.5 + 0.5)
                 ax[1, i].axis('off')
                 ax[2, i].imshow(x2y[i] * 0.5 + 0.5)
                 ax[2, i].axis('off')
+                grid_img = viz_flow(grids[i, ..., 0], grids[i, ..., 1])
+                ax[3, i].imshow(grid_img)
+                ax[3, i].axis('off')
             else:
+                ax[0, i].imshow(self.source[i] * 0.5 + 0.5)
+                ax[0, i].axis('off')
                 ax[1, i].imshow(x2y[i] * 0.5 + 0.5)
                 ax[1, i].axis('off')
         plt.tight_layout()
