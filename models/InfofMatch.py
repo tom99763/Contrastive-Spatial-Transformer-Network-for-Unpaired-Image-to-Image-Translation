@@ -4,7 +4,6 @@ sys.path.append('./models')
 from modules import *
 from losses import *
 from discriminators import Discriminator
-from tensorflow.keras.applications.vgg16 import VGG16
 import tensorflow as tf
 from tensorflow.keras import layers
 
@@ -49,22 +48,6 @@ class Generator(tf.keras.Model):
                 tf.transpose(grids_shift, perm=[0, 3, 1, 2])
         xa = bilinear_sampler(xa, grids)
         return xa, grids
-
-
-class Encoder(tf.keras.Model):
-    def __init__(self, config):
-        super().__init__()
-        self.nce_layers = config['nce_layers']
-        self.vgg = self.build_vgg()
-
-    def call(self, x):
-        return self.vgg(x)
-
-    def build_vgg(self):
-        vgg = VGG16(include_top=False)
-        vgg.trainable = False
-        outputs = [vgg.layers[idx].output for idx in self.nce_layers]
-        return tf.keras.Model(inputs=vgg.input, outputs=outputs)
 
 
 class PatchSampler(tf.keras.Model):
@@ -202,13 +185,16 @@ def bilinear_sampler(img, grids):
     return out
 
 
+def Encoder(model, config):
+    return 
+
 class InfoMatch(tf.keras.Model):
     def __init__(self, config):
         super().__init__()
         self.CP = Generator(config, 2) #coordinates predictor
         self.R = Generator(config, 3) #refinemer 
         self.D = Discriminator(config)
-        self.E = Encoder(self.D.blocks)
+        self.E = Encoder(self.D.blocks, config):
         self.F = PatchSampler(config) if config['loss_type']=='infonce' else None
         self.config=config
 
