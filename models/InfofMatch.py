@@ -3,6 +3,7 @@ import sys
 sys.path.append('./models')
 from modules import *
 from losses import *
+from discriminators import Discriminator
 from tensorflow.keras.applications.vgg16 import VGG16
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -206,7 +207,8 @@ class InfoMatch(tf.keras.Model):
         super().__init__()
         self.CP = Generator(config, 2) #coordinates predictor
         self.R = Generator(config, 3) #refinemer 
-        self.E = Encoder(config)
+        self.D = Discriminator(config)
+        self.E = Encoder(self.D.blocks)
         self.F = PatchSampler(config) if config['loss_type']=='infonce' else None
         self.config=config
 
