@@ -8,8 +8,8 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 
-class CoordPredictor(tf.keras.Model):
-    def __init__(self, config):
+class Generator(tf.keras.Model):
+    def __init__(self, config, num_channels):
         super().__init__()
         self.act = config['act']
         self.use_bias = config['use_bias']
@@ -36,7 +36,7 @@ class CoordPredictor(tf.keras.Model):
             self.blocks.add(ConvTransposeBlock(dim, 3, strides=2, padding='same',
                                                use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
         self.blocks.add(Padding2D(3, pad_type='reflect'))
-        self.blocks.add(ConvBlock(2, 7, padding='valid', activation='tanh'))
+        self.blocks.add(ConvBlock(num_channels, 7, padding='valid', activation='tanh'))
 
     def call(self, inputs):
         xa, xb = inputs
@@ -204,7 +204,8 @@ def bilinear_sampler(img, grids):
 class InfoMatch(tf.keras.Model):
     def __init__(self, config):
         super().__init__()
-        self.CP = CoordPredictor(config)
+        self.CP = Generator(config, 2) #coordinates predictor
+        self.R = Generator(config, 3) #refinemer 
         self.E = Encoder(config)
         self.F = PatchSampler(config) if config['loss_type']=='infonce' else None
         self.config=config
