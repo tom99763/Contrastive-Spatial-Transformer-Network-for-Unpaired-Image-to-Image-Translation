@@ -54,9 +54,40 @@ class Perceptual_Discriminator(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
     dim = config['base']
+    norm = 'none'
+    use_bias = config['use_bias']
+    act = tf.nn.leaky_relu
+    
+    self.blocks = tf.keras.Sequential([
+      layers.Input([None, None, 3])
+      ConvBlock(dim, 3, strides=1, padding='same', use_bias=use_bias, norm_layer=norm, activation=tf.nn.leaky_relu),
+      ConvBlock(dim, 3, strides=1, padding='same', use_bias=use_bias, norm_layer=norm, activation=tf.nn.leaky_relu)
+    ])
+    
+    for i in range(3):
+      dim * =2
+      self.blocks.add(layers.AveragePooling2D())
+      
+      if i<1:
+        self.blocks.add(ConvBlock(dim, 3, strides=1, padding='same',
+                                use_bias=use_bias, norm_layer=norm, activation=act))
+        self.blocks.add(ConvBlock(dim, 3, strides=1, padding='same',
+                                use_bias=use_bias, norm_layer=norm, activation=act))
+      else:
+        self.blocks.add(ConvBlock(dim, 3, strides=1, padding='same',
+                                use_bias=use_bias, norm_layer=norm, activation=act))
+        self.blocks.add(ConvBlock(dim, 3, strides=1, padding='same',
+                                use_bias=use_bias, norm_layer=norm, activation=act))
+        self.blocks.add(ConvBlock(dim, 3, strides=1, padding='same',
+                                use_bias=use_bias, norm_layer=norm, activation=act))
+        
+    self.blocks.add(Padding2D(1, pad_type='constant'))
+    self.blocks.add(ConvBlock(512, 4, padding='valid', use_bias=use_bias, norm_layer=norm, activation=act))
+    self.blocks.add(Padding2D(1, pad_type='constant'))
+    self.blocks.add(ConvBlock(1, 4, padding='valid'))
     
   def call(self, x):
-    return 
+    return self.blocks(x)
   
   
   
