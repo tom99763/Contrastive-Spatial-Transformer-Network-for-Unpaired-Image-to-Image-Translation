@@ -12,6 +12,9 @@ class Discriminator(tf.keras.Model):
     
     elif disc_type == 'patch':
       self.disc = Patch_Discriminator(config)
+      
+    elif disc_type == 'perceptual':
+      self.disc = Perceptual_Discriminator(config)
     
     elif disc_type == 'Multi_scale':
       self.disc = None
@@ -45,3 +48,15 @@ class Patch_Discriminator(tf.keras.Model):
     
   def call(self, x):
     return self.blocks(x)
+  
+  
+class Perceptual_Discriminator(tf.keras.Model):
+  def __init__(self, config):
+    super().__init__()
+    dim = config['base']
+    
+  def call(self, x):
+    return 
+  
+  
+  
