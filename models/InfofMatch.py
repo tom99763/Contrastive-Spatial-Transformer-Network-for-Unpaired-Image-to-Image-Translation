@@ -36,15 +36,13 @@ class CoordPredictor(tf.keras.Model):
             self.blocks.add(ConvTransposeBlock(dim, 3, strides=2, padding='same',
                                                use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
         self.blocks.add(Padding2D(3, pad_type='reflect'))
-        self.blocks.add(ConvBlock(2, 7, padding='valid'))
+        self.blocks.add(ConvBlock(2, 7, padding='valid', activation='tanh'))
 
     def call(self, inputs):
         xa, xb = inputs
         x = tf.concat([xa, xb], axis=-1)
         grids_shift = self.blocks(x)
         grids_shift = grids_shift / 10.
-        tv_loss =tf.image.total_variation(grids_shift) * x.shape[1]
-        self.add_loss(tv_loss)
 
         grids = affine_grid_generator(x.shape[1], x.shape[2], x.shape[0]) +\
                 tf.transpose(grids_shift, perm=[0, 3, 1, 2])
@@ -208,7 +206,7 @@ class InfoMatch(tf.keras.Model):
         super().__init__()
         self.CP = CoordPredictor(config)
         self.E = Encoder(config)
-        self.F = PatchSampler(config)
+        self.F = PatchSampler(config) if config['use_nce'] else None
         self.config=config
 
     def compile(self,
@@ -219,27 +217,58 @@ class InfoMatch(tf.keras.Model):
         self.G_optimizer = G_optimizer
         self.F_optimizer = F_optimizer
         self.D_optimizer = D_optimizer
-        self.nce_loss_func = PatchNCELoss(self.config['tau'])
+
+        if self.config['use_nce']:
+            self.nce_loss_func = PatchNCELoss(self.config['tau'])
+        else:
+            self.per_loss_func = perceptual_loss
 
     @tf.function
     def train_step(self, inputs):
         xa, xb = inputs
 
         with tf.GradientTape(persistent=True) as tape:
-            xa_wrapped, grids = self.CP([xa, xb])
-            l_info = self.nce_loss_func(xb, xa_wrapped, self.E, self.F)
-            l_tv = sum(self.CP.losses)
+            #translation
+            xa_wrapped, _ = self.CP([xa, xb])
+            #identity
+            if self.config['use_identity']:
+                xb_idt_wrapped, _ = self.CP([xb, xb])
 
-            loss = l_info + 1e-1 * l_tv
+            #comppute loss
+            if self.config['use_nce']:
+                l_info_trl = self.nce_loss_func(xb, xa_wrapped, self.E, self.F)
+                l_info_idt = self.nce_loss_func(xb, xb_idt_wrapped, self.E, self.F)\
+                    if self.config['use_identity'] else 0.
+            else:
+                l_info_trl = self.per_loss_func(xb, xa_wrapped, self.E)
+                l_info_idt = self.per_loss_func(xb, xb_idt_wrapped, self.E)\
+                    if self.config['use_identity'] else 0.
+
+            #total loss
+            loss = 0.5 * (l_info_trl + l_info_idt) \
+                    if self.config['use_identity'] else l_info_trl
 
         grads = tape.gradient(loss, self.CP.trainable_weights + self.F.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.CP.trainable_weights + self.F.trainable_weights))
-        return {'infonce': l_info, 'total variation': l_tv}
+        return {'info_trl': l_info_trl, 'info_idt':l_info_idt}
 
     @tf.function
     def test_step(self, inputs):
         xa, xb = inputs
-        xa_wrapped, grids = self.CP([xa, xb])
-        l_info = self.nce_loss_func(xb, xa_wrapped, self.E, self.F)
-        l_tv = sum(self.CP.losses)
-        return {'infonce': l_info, 'total variation': l_tv}
+        # translation
+        xa_wrapped, _ = self.CP([xa, xb])
+        # identity
+        if self.config['use_identity']:
+            xb_idt_wrapped, _ = self.CP([xb, xb])
+
+        # comppute loss
+        if self.config['use_nce']:
+            l_info_trl = self.nce_loss_func(xb, xa_wrapped, self.E, self.F)
+            l_info_idt = self.nce_loss_func(xb, xb_idt_wrapped, self.E, self.F) \
+                if self.config['use_identity'] else 0.
+        else:
+            l_info_trl = self.per_loss_func(xb, xa_wrapped, self.E)
+            l_info_idt = self.per_loss_func(xb, xb_idt_wrapped, self.E) \
+                if self.config['use_identity'] else 0.
+
+        return {'info_trl': l_info_trl, 'info_idt':l_info_idt}
