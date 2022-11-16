@@ -64,7 +64,7 @@ class Perceptual_Discriminator(tf.keras.Model):
       ConvBlock(dim, 3, strides=1, padding='same', use_bias=use_bias, norm_layer=norm, activation=tf.nn.leaky_relu)
     ])
     
-    for i in range(3):
+    for i in range(2):
       dim * =2
       self.blocks.add(layers.AveragePooling2D())
       
