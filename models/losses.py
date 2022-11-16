@@ -9,6 +9,15 @@ def l2_loss(x, y):
     return tf.reduce_mean((x - y) ** 2)
 
 
+def perceptual_loss(source, target, netE):
+    feat_source = netE(source, training=True)
+    feat_target = netE(target, training=True)
+    total_per_loss = 0.
+    for feat_s, feat_t in zip(feat_source, feat_target):
+        total_per_loss += l1_loss(feat_s, feat_t)
+    return total_per_loss
+
+
 def gan_loss(critic_real, critic_fake, gan_mode):
     if gan_mode == 'lsgan':
         d_loss = tf.reduce_mean((1 - critic_real) ** 2 + critic_fake ** 2)
