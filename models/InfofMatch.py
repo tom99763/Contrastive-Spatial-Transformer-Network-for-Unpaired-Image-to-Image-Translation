@@ -206,7 +206,7 @@ class InfoMatch(tf.keras.Model):
         super().__init__()
         self.CP = CoordPredictor(config)
         self.E = Encoder(config)
-        self.F = PatchSampler(config) if config['use_nce'] else None
+        self.F = PatchSampler(config) if config['loss_type']=='infonce' else None
         self.config=config
 
     def compile(self,
@@ -218,10 +218,12 @@ class InfoMatch(tf.keras.Model):
         self.F_optimizer = F_optimizer
         self.D_optimizer = D_optimizer
 
-        if self.config['use_nce']:
-            self.nce_loss_func = PatchNCELoss(self.config['tau'])
-        else:
-            self.per_loss_func = perceptual_loss
+        if self.config['loss_type']=='infonce':
+            self.loss_func = PatchNCELoss(self.config['tau'])
+        elif self.config['loss_type'] == 'perceptual_disctance':
+            self.loss_func = perceptual_loss
+        elif self.config['loss_type'] == 'pixel_distance':
+            self.loss_func = l1_loss
 
     @tf.function
     def train_step(self, inputs):
@@ -235,21 +237,28 @@ class InfoMatch(tf.keras.Model):
                 xb_idt_wrapped, _ = self.CP([xb, xb])
 
             #comppute loss
-            if self.config['use_nce']:
-                l_info_trl = self.nce_loss_func(xb, xa_wrapped, self.E, self.F)
-                l_info_idt = self.nce_loss_func(xb, xb_idt_wrapped, self.E, self.F)\
+            if self.config['loss_type'] == 'infonce':
+                l_info_trl = self.loss_func(xb, xa_wrapped, self.E, self.F)
+                l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E, self.F)\
                     if self.config['use_identity'] else 0.
-            else:
-                l_info_trl = self.per_loss_func(xb, xa_wrapped, self.E)
-                l_info_idt = self.per_loss_func(xb, xb_idt_wrapped, self.E)\
+            elif self.config['loss_type'] == 'perceptual_disctance':
+                l_info_trl = self.loss_func(xb, xa_wrapped, self.E)
+                l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E)\
+                    if self.config['use_identity'] else 0.
+
+            elif self.config['loss_type'] == 'pixel_distance':
+                l_info_trl = self.loss_func(xb, xa_wrapped)
+                l_info_idt = self.loss_func(xb, xb_idt_wrapped) \
                     if self.config['use_identity'] else 0.
 
             #total loss
             loss = 0.5 * (l_info_trl + l_info_idt) \
                     if self.config['use_identity'] else l_info_trl
 
-        grads = tape.gradient(loss, self.CP.trainable_weights + self.F.trainable_weights)
-        self.optimizer.apply_gradients(zip(grads, self.CP.trainable_weights + self.F.trainable_weights))
+        grads = tape.gradient(loss, self.CP.trainable_weights +
+                              self.F.trainable_weights if self.config['loss_type']=='infonce' else [])
+        self.optimizer.apply_gradients(zip(grads, self.CP.trainable_weights +
+                              self.F.trainable_weights if self.config['loss_type']=='infonce' else []))
         return {'info_trl': l_info_trl, 'info_idt':l_info_idt}
 
     @tf.function
@@ -262,13 +271,18 @@ class InfoMatch(tf.keras.Model):
             xb_idt_wrapped, _ = self.CP([xb, xb])
 
         # comppute loss
-        if self.config['use_nce']:
-            l_info_trl = self.nce_loss_func(xb, xa_wrapped, self.E, self.F)
-            l_info_idt = self.nce_loss_func(xb, xb_idt_wrapped, self.E, self.F) \
+        if self.config['loss_type'] == 'infonce':
+            l_info_trl = self.loss_func(xb, xa_wrapped, self.E, self.F)
+            l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E, self.F) \
                 if self.config['use_identity'] else 0.
-        else:
-            l_info_trl = self.per_loss_func(xb, xa_wrapped, self.E)
-            l_info_idt = self.per_loss_func(xb, xb_idt_wrapped, self.E) \
+        elif self.config['loss_type'] == 'perceptual_disctance':
+            l_info_trl = self.loss_func(xb, xa_wrapped, self.E)
+            l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E) \
+                if self.config['use_identity'] else 0.
+
+        elif self.config['loss_type'] == 'pixel_distance':
+            l_info_trl = self.loss_func(xb, xa_wrapped)
+            l_info_idt = self.loss_func(xb, xb_idt_wrapped) \
                 if self.config['use_identity'] else 0.
 
         return {'info_trl': l_info_trl, 'info_idt':l_info_idt}
