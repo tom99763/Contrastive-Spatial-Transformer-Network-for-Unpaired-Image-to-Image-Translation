@@ -220,7 +220,7 @@ class InfoMatch(tf.keras.Model):
 
         if self.config['loss_type']=='infonce':
             self.loss_func = PatchNCELoss(self.config['tau'])
-        elif self.config['loss_type'] == 'perceptual_disctance':
+        elif self.config['loss_type'] == 'perceptual_distance':
             self.loss_func = perceptual_loss
         elif self.config['loss_type'] == 'pixel_distance':
             self.loss_func = l1_loss
@@ -241,7 +241,7 @@ class InfoMatch(tf.keras.Model):
                 l_info_trl = self.loss_func(xb, xa_wrapped, self.E, self.F)
                 l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E, self.F)\
                     if self.config['use_identity'] else 0.
-            elif self.config['loss_type'] == 'perceptual_disctance':
+            elif self.config['loss_type'] == 'perceptual_distance':
                 l_info_trl = self.loss_func(xb, xa_wrapped, self.E)
                 l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E)\
                     if self.config['use_identity'] else 0.
@@ -275,7 +275,7 @@ class InfoMatch(tf.keras.Model):
             l_info_trl = self.loss_func(xb, xa_wrapped, self.E, self.F)
             l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E, self.F) \
                 if self.config['use_identity'] else 0.
-        elif self.config['loss_type'] == 'perceptual_disctance':
+        elif self.config['loss_type'] == 'perceptual_distance':
             l_info_trl = self.loss_func(xb, xa_wrapped, self.E)
             l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E) \
                 if self.config['use_identity'] else 0.
