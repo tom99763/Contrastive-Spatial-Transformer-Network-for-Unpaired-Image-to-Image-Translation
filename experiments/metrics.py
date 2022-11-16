@@ -48,7 +48,10 @@ class MetricsCallbacks(callbacks.Callback):
         Eab = []
         for xa, xb in self.validation_data:
             # translation
-            xab = self.model.G(xa)
+            if self.opt.model =='InfoMatch':
+                xab, grids = self.model.CP([xa, xb])
+            else:
+                xab = self.model.G(xa)
 
             # preprocess
             xb = self.preprocess(xb)
