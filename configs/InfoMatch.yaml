@@ -1,0 +1,15 @@
+#network
+base: 64
+num_downsamples: 2
+num_resblocks: 9
+use_bias: True
+act: 'relu'
+norm: 'instance'
+
+#PatchNCE
+units: 256
+num_patches: 256
+tau: 0.07
+nce_layers: [0, 2, 5, 8, 13]
+use_nce: True
+use_identity: True
