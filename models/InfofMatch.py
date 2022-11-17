@@ -226,17 +226,30 @@ class InfoMatch(tf.keras.Model):
         xa, xb = inputs
 
         with tf.GradientTape(persistent=True) as tape:
+            ###Forward
             #translation
             xa_wrapped, _ = self.CP([xa, xb])
+            xab = self.R(xa_wrapped)
+            
             #identity
             if self.config['use_identity']:
                 xb_idt_wrapped, _ = self.CP([xb, xb])
-
-            #comppute loss
+                xbb = self.R(xb_idt_wrapped)
+                
+            #discrimination
+            critic_real = self.D(xb)
+            critic_fake = self.D(xab)
+            
+            ###compute loss
+            #adversarial loss
+            d_loss, g_loss = gan_loss(critic_real, critic_fake, self.config['gan_mode'])
+            
+            #perceptual loss
             if self.config['loss_type'] == 'infonce':
                 l_info_trl = self.loss_func(xb, xa_wrapped, self.E, self.F)
                 l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E, self.F)\
                     if self.config['use_identity'] else 0.
+                
             elif self.config['loss_type'] == 'perceptual_distance':
                 l_info_trl = self.loss_func(xb, xa_wrapped, self.E)
                 l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E)\
@@ -248,14 +261,21 @@ class InfoMatch(tf.keras.Model):
                     if self.config['use_identity'] else 0.
 
             #total loss
-            loss = 0.5 * (l_info_trl + l_info_idt) \
+            l_info = 0.5 * (l_info_trl + l_info_idt) \
                     if self.config['use_identity'] else l_info_trl
+            
+            l_g = g_loss + l_info
+            l_d = d_loss
 
-        grads = tape.gradient(loss, self.CP.trainable_weights +
+        Ggrads = tape.gradient(l_g, self.CP.trainable_weights + self.R.trainable_weights +
                               self.F.trainable_weights if self.config['loss_type']=='infonce' else [])
-        self.optimizer.apply_gradients(zip(grads, self.CP.trainable_weights +
+        Dgrads = tape.gradient(l_d, self.D.traianble_weights)
+        
+        self.G_optimizer.apply_gradients(zip(Ggrads, self.CP.trainable_weights + self.R.trainable_weights +
                               self.F.trainable_weights if self.config['loss_type']=='infonce' else []))
-        return {'info_trl': l_info_trl, 'info_idt':l_info_idt}
+        self.D_optimizer.apply_gradients(zip(Dgrads, self.D.trainable_weights))
+        
+        return {'info_trl': l_info_trl, 'info_idt':l_info_idt, 'g_loss':g_loss, 'd_loss':d_loss}
 
     @tf.function
     def test_step(self, inputs):
