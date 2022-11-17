@@ -9,8 +9,9 @@ from tensorflow.keras import layers
 
 
 class Generator(tf.keras.Model):
-    def __init__(self, config, num_channels):
+    def __init__(self, config, num_inputs, num_channels):
         super().__init__()
+        self.num_inputs = num_inputs
         self.act = config['act']
         self.use_bias = config['use_bias']
         self.norm = config['norm']
@@ -39,16 +40,19 @@ class Generator(tf.keras.Model):
         self.blocks.add(ConvBlock(num_channels, 7, padding='valid', activation='tanh'))
 
     def call(self, inputs):
-        xa, xb = inputs
-        x = tf.concat([xa, xb], axis=-1)
-        grids_shift = self.blocks(x)
-        grids_shift = grids_shift / 10.
-
-        grids = affine_grid_generator(x.shape[1], x.shape[2], x.shape[0]) +\
+        if self.num_inputs == 2:
+            xa, xb = inputs
+            x = tf.concat([xa, xb], axis=-1)
+            grids_shift = self.blocks(x)
+            grids_shift = grids_shift / 10.
+            grids = affine_grid_generator(x.shape[1], x.shape[2], x.shape[0]) +\
                 tf.transpose(grids_shift, perm=[0, 3, 1, 2])
-        xa = bilinear_sampler(xa, grids)
-        return xa, grids
-
+            xa = bilinear_sampler(xa, grids)
+            return xa, grids
+        else:
+            x = inputs
+            x = self.blocks(x)
+            return x
 
 class PatchSampler(tf.keras.Model):
     def __init__(self, config, **kwargs):
@@ -184,15 +188,18 @@ def bilinear_sampler(img, grids):
 
     return out
 
-
 def Encoder(model, config):
-    return 
+    nce_layers=config['nce_layers']
+    outputs=[]
+    for idx in nce_layers:
+        outputs.append(model.layers[idx].output)
+    return tf.keras.Model(inputs=model.inputs, outputs=outputs)
 
 class InfoMatch(tf.keras.Model):
     def __init__(self, config):
         super().__init__()
-        self.CP = Generator(config, 2) #coordinates predictor
-        self.R = Generator(config, 3) #refinemer 
+        self.CP = Generator(config, 2, 2) #coordinates predictor
+        self.R = Generator(config, 1, 3) #refinemer 
         self.D = Discriminator(config)
         self.E = Encoder(self.D.blocks, config):
         self.F = PatchSampler(config) if config['loss_type']=='infonce' else None
