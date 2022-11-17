@@ -59,7 +59,7 @@ class Perceptual_Discriminator(tf.keras.Model):
     act = tf.nn.leaky_relu
     
     self.blocks = tf.keras.Sequential([
-      layers.Input([None, None, 3])
+      layers.Input([None, None, 3]),
       ConvBlock(dim, 3, strides=1, padding='same', use_bias=use_bias, norm_layer=norm, activation=act),
       ConvBlock(dim, 3, strides=1, padding='same', use_bias=use_bias, norm_layer=norm, activation=act)
     ])
