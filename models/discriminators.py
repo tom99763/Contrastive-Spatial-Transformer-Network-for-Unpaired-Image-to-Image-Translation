@@ -64,8 +64,8 @@ class Perceptual_Discriminator(tf.keras.Model):
       ConvBlock(dim, 3, strides=1, padding='same', use_bias=use_bias, norm_layer=norm, activation=act)
     ])
     
-    for i in range():
-      dim * =2
+    for i in range(3):
+      dim  = dim * 2
       self.blocks.add(layers.AveragePooling2D())
       
       if i<1:
