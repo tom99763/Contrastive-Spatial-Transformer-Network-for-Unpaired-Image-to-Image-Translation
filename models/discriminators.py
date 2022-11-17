@@ -54,7 +54,7 @@ class Perceptual_Discriminator(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
     dim = config['base']
-    norm = 'none'
+    norm = config['norm']
     use_bias = config['use_bias']
     act = tf.nn.leaky_relu
     
