@@ -44,18 +44,15 @@ class Generator(tf.keras.Model):
         if refinement:
             self.alpha = tf.Variable(0., trainable=True)
 
-    def call(self, inputs):
+    def call(self, x):
         if not self.refinement:
-            xa, xb = inputs
-            x = tf.concat([xa, xb], axis=-1)
             grids_shift = self.blocks(x)
             grids_shift = grids_shift / 10.
             grids = affine_grid_generator(x.shape[1], x.shape[2], x.shape[0]) + \
                     tf.transpose(grids_shift, perm=[0, 3, 1, 2])
-            xab = bilinear_sampler(xa, grids)
-            return xab, grids
+            x = bilinear_sampler(x, grids)
+            return x, grids
         else:
-            x = inputs
             residual = self.blocks(x)
             return tf.clip_by_value(self.alpha * residual + x, -1., 1.)
 
@@ -251,11 +248,11 @@ class InfoMatch(tf.keras.Model):
         with tf.GradientTape(persistent=True) as tape:
             ###Forward
             # translation
-            xab_wrapped, _ = self.CP([xa, xb])  # input xa conditioned on xb
+            xab_wrapped, _ = self.CP(xa)  # input xa conditioned on xb
 
             # identity
             if self.config['use_identity']:
-                xb_idt_wrapped, _ = self.CP([xb, xb])
+                xb_idt_wrapped, _ = self.CP(xb)
 
             # discrimination
             critic_real = self.D(xb)
