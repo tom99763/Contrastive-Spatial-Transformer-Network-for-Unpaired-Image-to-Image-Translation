@@ -44,10 +44,8 @@ class Generator(tf.keras.Model):
         if refinement:
             self.alpha = tf.Variable(0., trainable=True)
 
-    def call(self, inputs):
+    def call(self, x):
         if not self.refinement:
-            xa, xb = inputs
-            x = tf.concat([xa, xb], axis=-1)
             grids_shift = self.blocks(x)
             grids_shift = grids_shift / 10.
             grids = affine_grid_generator(x.shape[1], x.shape[2], x.shape[0]) + \
@@ -55,7 +53,6 @@ class Generator(tf.keras.Model):
             xa_wrapped = bilinear_sampler(xa, grids)
             return xa_wrapped, grids
         else:
-            x = inputs
             residual = self.blocks(x)
             return tf.clip_by_value(self.alpha * residual + x, -1., 1.)
 
@@ -252,12 +249,12 @@ class InfoMatch(tf.keras.Model):
         with tf.GradientTape(persistent=True) as tape:
             ###Forward
             # translation
-            xab_wrapped, _ = self.CP([xa, xb])  # input xa conditioned on xb
+            xab_wrapped, _ = self.CP(xa)  # input xa conditioned on xb
             xab = self.R(xab_wrapped)
 
             # identity
             if self.config['use_identity']:
-                xb_idt_wrapped, _ = self.CP([xb, xb])
+                xb_idt_wrapped, _ = self.CP(xb)
                 xb_idt = self.R(xb_idt_wrapped)
 
             # discrimination
@@ -311,12 +308,12 @@ class InfoMatch(tf.keras.Model):
         xa, xb = inputs
         ###Forward
         # translation
-        xab_wrapped, _ = self.CP([xa, xb])  # input xa conditioned on xb
+        xab_wrapped, _ = self.CP(xa)  # input xa conditioned on xb
         xab = self.R(xab_wrapped)
 
         # identity
         if self.config['use_identity']:
-            xb_idt_wrapped, _ = self.CP([xb, xb])
+            xb_idt_wrapped, _ = self.CP(xb)
             xb_idt = self.R(xb_idt_wrapped)
 
         # perceptual loss
