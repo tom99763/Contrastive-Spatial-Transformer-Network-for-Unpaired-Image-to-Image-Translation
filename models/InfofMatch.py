@@ -262,26 +262,30 @@ class InfoMatch(tf.keras.Model):
 
             # discrimination
             critic_real = self.D(xb)
-            critic_fake = self.D(xab)
+            critic_fake_refine = self.D(xab)
+            critic_fake_wrapped = self.D(xab_wrapped)
 
             ###compute loss
             # adversarial loss
-            d_loss, g_loss = gan_loss(critic_real, critic_fake, self.config['gan_mode'])
+            d_loss_refine, g_loss_refine = gan_loss(critic_real, critic_fake_refine, self.config['gan_mode'])
+            d_loss_wrapped, g_loss_wrapped = gan_loss(critic_real, critic_fake_wrapped, self.config['gan_mode'])
+            d_loss = 0.5 * (d_loss_refine + d_loss_wrapped)
+            g_loss = 0.5 * (g_loss_refine + g_loss_wrapped)
 
             # perceptual loss
             if self.config['loss_type'] == 'infonce':
-                l_info_trl = self.loss_func(xa, xab, self.E, self.F)
-                l_info_idt = self.loss_func(xb, xb_idt, self.E, self.F) \
+                l_info_trl = self.loss_func(xab_wrapped, xab, self.E, self.F)
+                l_info_idt = self.loss_func(xb_idt_wrapped, xb_idt, self.E, self.F) \
                     if self.config['use_identity'] else 0.
 
             elif self.config['loss_type'] == 'perceptual_distance':
-                l_info_trl = self.loss_func(xa, xab, self.E)
-                l_info_idt = self.loss_func(xb, xb_idt, self.E) \
+                l_info_trl = self.loss_func(xab_wrapped, xab, self.E)
+                l_info_idt = self.loss_func(xb_idt_wrapped, xb_idt, self.E) \
                     if self.config['use_identity'] else 0.
 
             elif self.config['loss_type'] == 'pixel_distance':
-                l_info_trl = self.loss_func(xb, xab)
-                l_info_idt = self.loss_func(xb, xb_idt) \
+                l_info_trl = self.loss_func(xab_wrapped, xab)
+                l_info_idt = self.loss_func(xb_idt_wrapped, xb_idt) \
                     if self.config['use_identity'] else 0.
 
             # total loss
@@ -308,25 +312,27 @@ class InfoMatch(tf.keras.Model):
         ###Forward
         # translation
         xab_wrapped, _ = self.CP([xa, xb])  # input xa conditioned on xb
+        xab = self.R(xab_wrapped)
 
         # identity
         if self.config['use_identity']:
             xb_idt_wrapped, _ = self.CP([xb, xb])
+            xb_idt = self.R(xb_idt_wrapped)
 
         # perceptual loss
         if self.config['loss_type'] == 'infonce':
-            l_info_trl = self.loss_func(xb, xab_wrapped, self.E, self.F)
-            l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E, self.F) \
+            l_info_trl = self.loss_func(xab_wrapped, xab, self.E, self.F)
+            l_info_idt = self.loss_func(xb_idt_wrapped, xb_idt, self.E, self.F) \
                 if self.config['use_identity'] else 0.
 
         elif self.config['loss_type'] == 'perceptual_distance':
-            l_info_trl = self.loss_func(xb, xab_wrapped, self.E)
-            l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E) \
+            l_info_trl = self.loss_func(xab_wrapped, xab, self.E)
+            l_info_idt = self.loss_func(xb_idt_wrapped, xb_idt, self.E) \
                 if self.config['use_identity'] else 0.
 
         elif self.config['loss_type'] == 'pixel_distance':
-            l_info_trl = self.loss_func(xb, xab_wrapped)
-            l_info_idt = self.loss_func(xb, xb_idt_wrapped) \
+            l_info_trl = self.loss_func(xab_wrapped, xab)
+            l_info_idt = self.loss_func(xb_idt_wrapped, xb_idt) \
                 if self.config['use_identity'] else 0.
 
         return {'info_trl': l_info_trl, 'info_idt': l_info_idt}
