@@ -270,12 +270,12 @@ class InfoMatch(tf.keras.Model):
 
             # perceptual loss
             if self.config['loss_type'] == 'infonce':
-                l_info_trl = self.loss_func(xb, xab, self.E, self.F)
+                l_info_trl = self.loss_func(xa, xab, self.E, self.F)
                 l_info_idt = self.loss_func(xb, xb_idt, self.E, self.F) \
                     if self.config['use_identity'] else 0.
 
             elif self.config['loss_type'] == 'perceptual_distance':
-                l_info_trl = self.loss_func(xb, xab, self.E)
+                l_info_trl = self.loss_func(xa, xab, self.E)
                 l_info_idt = self.loss_func(xb, xb_idt, self.E) \
                     if self.config['use_identity'] else 0.
 
