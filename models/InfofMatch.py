@@ -301,11 +301,11 @@ class InfoMatch(tf.keras.Model):
         xa, xb = inputs
         ###Forward
         # translation
-        xab_wrapped, _ = self.CP([xa, xb])  # input xa conditioned on xb
+        xab_wrapped, _ = self.CP(xa)  # input xa conditioned on xb
 
         # identity
         if self.config['use_identity']:
-            xb_idt_wrapped, _ = self.CP([xb, xb])
+            xb_idt_wrapped, _ = self.CP(xb)
 
         ###compute loss
 
