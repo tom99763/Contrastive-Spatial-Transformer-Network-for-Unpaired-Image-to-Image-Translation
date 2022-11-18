@@ -44,15 +44,18 @@ class Generator(tf.keras.Model):
         if refinement:
             self.alpha = tf.Variable(0., trainable=True)
 
-    def call(self, x):
+    def call(self, inputs):
         if not self.refinement:
+            xa, xb = inputs
+            x = tf.concat([xa, xb], axis=-1)
             grids_shift = self.blocks(x)
             grids_shift = grids_shift / 10.
             grids = affine_grid_generator(x.shape[1], x.shape[2], x.shape[0]) + \
                     tf.transpose(grids_shift, perm=[0, 3, 1, 2])
-            x = bilinear_sampler(x, grids)
-            return x, grids
+            xa_wrapped = bilinear_sampler(xa, grids)
+            return xa_wrapped, grids
         else:
+            x = inputs
             residual = self.blocks(x)
             return tf.clip_by_value(self.alpha * residual + x, -1., 1.)
 
@@ -220,6 +223,7 @@ class InfoMatch(tf.keras.Model):
     def __init__(self, config):
         super().__init__()
         self.CP = Generator(config, False)
+        self.R = Generator(config, True)
         self.D = Discriminator(config)
         self.E = PerceptualEncoder(config)
         self.F = PatchSampler(config) if config['loss_type'] == 'infonce' else None
@@ -248,15 +252,17 @@ class InfoMatch(tf.keras.Model):
         with tf.GradientTape(persistent=True) as tape:
             ###Forward
             # translation
-            xab_wrapped, _ = self.CP(xa)  # input xa conditioned on xb
+            xab_wrapped, _ = self.CP([xa, xb])  # input xa conditioned on xb
+            xab = self.R(xab_wrapped)
 
             # identity
             if self.config['use_identity']:
-                xb_idt_wrapped, _ = self.CP(xb)
+                xb_idt_wrapped, _ = self.CP([xb, xb])
+                xb_idt = self.R(xb_idt_wrapped)
 
             # discrimination
             critic_real = self.D(xb)
-            critic_fake = self.D(xab_wrapped)
+            critic_fake = self.D(xab)
 
             ###compute loss
             # adversarial loss
@@ -264,18 +270,18 @@ class InfoMatch(tf.keras.Model):
 
             # perceptual loss
             if self.config['loss_type'] == 'infonce':
-                l_info_trl = self.loss_func(xa, xab_wrapped, self.E, self.F)
-                l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E, self.F) \
+                l_info_trl = self.loss_func(xb, xab, self.E, self.F)
+                l_info_idt = self.loss_func(xb, xb_idt, self.E, self.F) \
                     if self.config['use_identity'] else 0.
 
             elif self.config['loss_type'] == 'perceptual_distance':
-                l_info_trl = self.loss_func(xa, xab_wrapped, self.E)
-                l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E) \
+                l_info_trl = self.loss_func(xb, xab, self.E)
+                l_info_idt = self.loss_func(xb, xb_idt, self.E) \
                     if self.config['use_identity'] else 0.
 
             elif self.config['loss_type'] == 'pixel_distance':
-                l_info_trl = self.loss_func(xa, xab_wrapped)
-                l_info_idt = self.loss_func(xb, xb_idt_wrapped) \
+                l_info_trl = self.loss_func(xb, xab)
+                l_info_idt = self.loss_func(xb, xb_idt) \
                     if self.config['use_identity'] else 0.
 
             # total loss
@@ -285,11 +291,11 @@ class InfoMatch(tf.keras.Model):
             l_g = g_loss + l_info
             l_d = d_loss
 
-        Ggrads = tape.gradient(l_g, self.CP.trainable_weights +
+        Ggrads = tape.gradient(l_g, self.CP.trainable_weights + self.R.trainable_weights +
                                     self.F.trainable_weights if self.config['loss_type'] == 'infonce' else [])
         Dgrads = tape.gradient(l_d, self.D.trainable_weights)
 
-        self.G_optimizer.apply_gradients(zip(Ggrads, self.CP.trainable_weights +
+        self.G_optimizer.apply_gradients(zip(Ggrads, self.CP.trainable_weights + self.R.trainable_weights +
                                                      self.F.trainable_weights if self.config[
                                                                                      'loss_type'] == 'infonce' else []))
         self.D_optimizer.apply_gradients(zip(Dgrads, self.D.trainable_weights))
@@ -301,27 +307,25 @@ class InfoMatch(tf.keras.Model):
         xa, xb = inputs
         ###Forward
         # translation
-        xab_wrapped, _ = self.CP(xa)  # input xa conditioned on xb
+        xab_wrapped, _ = self.CP([xa, xb])  # input xa conditioned on xb
 
         # identity
         if self.config['use_identity']:
-            xb_idt_wrapped, _ = self.CP(xb)
-
-        ###compute loss
+            xb_idt_wrapped, _ = self.CP([xb, xb])
 
         # perceptual loss
         if self.config['loss_type'] == 'infonce':
-            l_info_trl = self.loss_func(xa, xab_wrapped, self.E, self.F)
+            l_info_trl = self.loss_func(xb, xab_wrapped, self.E, self.F)
             l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E, self.F) \
                 if self.config['use_identity'] else 0.
 
         elif self.config['loss_type'] == 'perceptual_distance':
-            l_info_trl = self.loss_func(xa, xab_wrapped, self.E)
+            l_info_trl = self.loss_func(xb, xab_wrapped, self.E)
             l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E) \
                 if self.config['use_identity'] else 0.
 
         elif self.config['loss_type'] == 'pixel_distance':
-            l_info_trl = self.loss_func(xa, xab_wrapped)
+            l_info_trl = self.loss_func(xb, xab_wrapped)
             l_info_idt = self.loss_func(xb, xb_idt_wrapped) \
                 if self.config['use_identity'] else 0.
 
