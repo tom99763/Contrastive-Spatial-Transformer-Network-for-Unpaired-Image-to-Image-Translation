@@ -36,7 +36,9 @@ class Generator(tf.keras.Model):
         for _ in range(self.num_downsampls):
             dim = dim / 2
             self.blocks.add(ConvTransposeBlock(dim, 3, strides=2, padding='same',
-                                               use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
+                                               use_bias=self.use_bias,
+                                               norm_layer='layer' if refinement else self.norm,
+                                               activation=self.act))
         self.blocks.add(Padding2D(3, pad_type='reflect'))
         self.blocks.add(ConvBlock(2 if not refinement else 3,
                                   7, padding='valid', activation='tanh'))
@@ -44,15 +46,18 @@ class Generator(tf.keras.Model):
         if refinement:
             self.alpha = tf.Variable(0., trainable=True)
 
-    def call(self, x):
+    def call(self, inputs):
         if not self.refinement:
+            xa ,xb = inputs #a:dog, b:cat
+            x = tf.concat([xa, xb], axis=-1)
             grids_shift = self.blocks(x)
             grids_shift = grids_shift / 10.
             grids = affine_grid_generator(x.shape[1], x.shape[2], x.shape[0]) + \
                     tf.transpose(grids_shift, perm=[0, 3, 1, 2])
-            x_wrapped = bilinear_sampler(x, grids)
-            return x_wrapped, grids
+            xb_wrapped = bilinear_sampler(xb, grids) #wrapping b's shape to a's
+            return xb_wrapped, grids
         else:
+            x = inputs
             residual = self.blocks(x)
             residual = residual * self.alpha
             x = tf.clip_by_value(residual + x, -1., 1.)
@@ -251,13 +256,12 @@ class InfoMatch(tf.keras.Model):
         with tf.GradientTape(persistent=True) as tape:
             ###Forward
             # translation
-            xa_noised = xa + tf.random.normal(xa.shape)
-            xab_wrapped, _ = self.CP(xa_noised)  # input xa conditioned on xb
-            xab, _ = self.R(xab_wrapped)
+            xab_wrapped, _ = self.CP([xa, xb])  # wrap b's shape to a
+            xab, _ = self.R(xab_wrapped) #synthesis by adding residual 
 
             # identity
             if self.config['use_identity']:
-                xb_idt_wrapped, _ = self.CP(xb)
+                xb_idt_wrapped, _ = self.CP([xb, xb])
 
             # discrimination
             critic_real = self.D(xb)
@@ -305,26 +309,27 @@ class InfoMatch(tf.keras.Model):
         xa, xb = inputs
         ###Forward
         # translation
-        xa_noised = xa + tf.random.normal(xa.shape)
-        xab_wrapped, _ = self.CP(xa_noised)  # input xa conditioned on xb
+        xab_wrapped, _ = self.CP(xa)  # input xa conditioned on xb
+        xab, _ = self.R(xab_wrapped)
 
         # identity
         if self.config['use_identity']:
             xb_idt_wrapped, _ = self.CP(xb)
+            xb_idt, _ = self.R(xb_idt_wrapped)
 
         # perceptual loss
         if self.config['loss_type'] == 'infonce':
-            l_info_trl = self.loss_func(xa, xab_wrapped, self.E, self.F)
+            l_info_trl = self.loss_func(xb, xab_wrapped, self.E, self.F)
             l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E, self.F) \
                 if self.config['use_identity'] else 0.
 
         elif self.config['loss_type'] == 'perceptual_distance':
-            l_info_trl = self.loss_func(xa, xab_wrapped, self.E)
+            l_info_trl = self.loss_func(xb, xab_wrapped, self.E)
             l_info_idt = self.loss_func(xb, xb_idt_wrapped, self.E) \
                 if self.config['use_identity'] else 0.
 
         elif self.config['loss_type'] == 'pixel_distance':
-            l_info_trl = self.loss_func(xa, xab_wrapped)
+            l_info_trl = self.loss_func(xb, xab_wrapped)
             l_info_idt = self.loss_func(xb, xb_idt_wrapped) \
                 if self.config['use_identity'] else 0.
 
