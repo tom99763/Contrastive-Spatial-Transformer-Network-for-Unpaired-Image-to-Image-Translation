@@ -17,7 +17,7 @@ def load_model(opt):
         params = f"{config['tau']}_{config['lambda_nce']}_{config['use_identity']}"
     elif opt.model == 'InfoMatch':
         model = InfoMatch.InfoMatch(config)
-        params = f"{config['use_nce']}_{config['tau']}_{config['use_identity']}"
+        params = f"{config['loss_type']}_{config['tau']}_{config['use_identity']}"
     return model, params
 
 
@@ -144,25 +144,28 @@ class VisualizeCallback(callbacks.Callback):
         b, h, w, c = self.target.shape
 
         if self.opt.model == 'InfoMatch':
-            x2y, grids = self.model.CP([self.source, self.target])
+            x2y_wrapped, grids = self.model.CP(self.source)
+            x2y, rxy = self.model.R(x2y_wrapped)
             grids = tf.transpose(grids, [0, 2, 3, 1])
         else:
             x2y = self.model.G(self.source)
 
-        fig, ax = plt.subplots(ncols=b, nrows=4 if self.opt.model == 'InfoMatch' else 2, figsize=(8, 8))
+        fig, ax = plt.subplots(ncols=b, nrows=5 if self.opt.model == 'InfoMatch' else 2, figsize=(16, 16))
 
         for i in range(b):
 
             if self.opt.model == 'InfoMatch':
                 ax[0, i].imshow(self.source[i] * 0.5 + 0.5)
                 ax[0, i].axis('off')
-                ax[1, i].imshow(self.target[i] * 0.5 + 0.5)
+                ax[1, i].imshow(x2y_wrapped[i] * 0.5 + 0.5)
                 ax[1, i].axis('off')
-                ax[2, i].imshow(x2y[i] * 0.5 + 0.5)
+                ax[2, i].imshow(rxy[i] * 0.5 + 0.5)
                 ax[2, i].axis('off')
-                grid_img = viz_flow(grids[i, ..., 0], grids[i, ..., 1])
-                ax[3, i].imshow(grid_img)
+                ax[3, i].imshow(x2y[i] * 0.5 + 0.5)
                 ax[3, i].axis('off')
+                grid_img = viz_flow(grids[i, ..., 0], grids[i, ..., 1])
+                ax[4, i].imshow(grid_img)
+                ax[4, i].axis('off')
             else:
                 ax[0, i].imshow(self.source[i] * 0.5 + 0.5)
                 ax[0, i].axis('off')
