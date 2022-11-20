@@ -112,11 +112,12 @@ class MetricsCallbacks(callbacks.Callback):
         prob = layers.Dense(2)(feature)
         prob = tf.nn.softmax(prob, axis=-1)
 
-        outputs = [prob, feature]
 
         if self.train:
             return tf.keras.Model(inputs=inception_model.input, outputs=[prob])
         else:
+            pred = tf.argmax(prob, axis=-1)
+            outputs=[pred, feature]
             return tf.keras.Model(inputs=inception_model.input, outputs=outputs)
 
 
