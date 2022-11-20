@@ -2,4 +2,4 @@
 
 ## Design Concept 
 
-![flowchart](./images/concept.png)
+![flowchart](./example/concept.png)
