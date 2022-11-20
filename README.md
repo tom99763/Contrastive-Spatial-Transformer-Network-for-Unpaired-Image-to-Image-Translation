@@ -2,4 +2,4 @@
 
 ### Design concept 
 
-![flowchart](./example/concept.png)
+<img src='../example/concept.png' align="right" width=960>
