@@ -5,7 +5,6 @@ from losses import *
 from discriminators import Discriminator
 import tensorflow as tf
 from tensorflow.keras import layers
-from tensorflow.keras.applications.vgg16 import VGG16
 
 
 class Generator(tf.keras.Model):
@@ -42,7 +41,7 @@ class Generator(tf.keras.Model):
     return self.blocks(x)
 
 
-class InfoMatch(tf.keras.Model):
+class CycleGAN(tf.keras.Model):
     def __init__(self, config):
         super().__init__()
         self.Ga = Generator(config)
