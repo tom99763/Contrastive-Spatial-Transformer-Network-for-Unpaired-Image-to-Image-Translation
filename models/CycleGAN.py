@@ -53,22 +53,24 @@ class CycleGAN(tf.keras.Model):
         self.config = config
 
     def compile(self,
-                G_optimizer,
-                F_optimizer,
-                D_optimizer):
+                Ga_optimizer,
+                Gb_optimizer,
+                Da_optimizer,
+                Db_optimizer
+                ):
         super().compile()
-        self.G_optimizer = G_optimizer
-        self.F_optimizer = F_optimizer
-        self.D_optimizer = D_optimizer
+        self.Ga_optimizer = Ga_optimizer
+        self.Gb_optimizer = Gb_optimizer
+        self.Da_optimizer = Da_optimizer
+        self.Db_optimizer = Db_optimizer
+
 
     @tf.function
     def train_step(self, inputs):
         xa, xb = inputs
 
         with tf.GradientTape(persistent=True) as tape:
-            xaa = self.Ga(xa)
             xba = self.Ga(xb)
-            xbb = self.Gb(xb)
             xab = self.Gb(xa)
 
             # cyclic
@@ -81,32 +83,35 @@ class CycleGAN(tf.keras.Model):
             critic_real_b = self.Db(xb)
             critic_fake_b = self.Da(xab)
 
-            critic_real = tf.concat([critic_real_a, critic_real_b], axis=0)
-            critic_fake = tf.concat([critic_fake_a, critic_fake_b], axis=0)
-
             ###compute loss
-            d_loss, g_loss = gan_loss(critic_real, critic_fake, self.config['gan_mode'])
-            l_r = l1_loss(xa, xaa) + l1_loss(xb, xbb)
-            l_cycle = l1_loss(xa, xaba) + l1_loss(xb, xbab)
-            l_g = g_loss + l_r + l_cycle
-            l_d = d_loss
+            da_loss, ga_loss = gan_loss(critic_real_a, critic_fake_a , self.config['gan_mode'])
+            db_loss, gb_loss = gan_loss(critic_real_b, critic_fake_b, self.config['gan_mode'])
 
-        Ggrads = tape.gradient(l_g, self.Ga.trainable_weights + self.Gb.trainable_weights)
-        Dgrads = tape.gradient(l_d, self.Da.trainable_weights + self.Db.trainable_weights)
-        self.G_optimizer.apply_gradients(zip(Ggrads, self.Ga.trainable_weights + self.Gb.trainable_weights))
-        self.D_optimizer.apply_gradients(zip(Dgrads, self.Da.trainable_weights + self.Db.trainable_weights))
-        return {'l_r': l_r, 'l_cycle': l_cycle, 'g_loss': g_loss, 'd_loss': d_loss}
+            l_cycle = l1_loss(xa, xaba) + l1_loss(xb, xbab)
+
+            l_ga = ga_loss + 10 * l_cycle
+            l_gb = gb_loss + 10 * l_cycle
+            l_da = da_loss
+            l_db = db_loss
+
+        Gagrads = tape.gradient(l_ga, self.Ga.trainable_weights)
+        Gbgrads = tape.gradient(l_gb, self.Gb.trainable_weights)
+        Dagrads = tape.gradient(l_da, self.Da.trainable_weights)
+        Dbgrads = tape.gradient(l_db, self.Db.trainable_weights)
+
+        self.Ga_optimizer.apply_gradients(zip(Gagrads, self.Ga.trainable_weights))
+        self.Gb_optimizer.apply_gradients(zip(Gbgrads, self.Gb.trainable_weights))
+        self.Da_optimizer.apply_gradients(zip(Dagrads, self.Da.trainable_weights))
+        self.Db_optimizer.apply_gradients(zip(Dbgrads, self.Db.trainable_weights))
+        return {'l_cycle': l_cycle, 'g_loss': l_ga + l_gb, 'd_loss': l_da + l_db}
 
     @tf.function
     def test_step(self, inputs):
         xa, xb = inputs
-        xaa = self.Ga(xa)
         xba = self.Ga(xb)
-        xbb = self.Gb(xb)
         xab = self.Gb(xa)
         # cyclic
         xaba = self.Ga(xab)
         xbab = self.Gb(xba)
-        l_r = l1_loss(xa, xaa) + l1_loss(xb, xbb)
         l_cycle = l1_loss(xa, xaba) + l1_loss(xb, xbab)
-        return {'l_r': l_r, 'l_cycle': l_cycle}
+        return {'l_cycle': l_cycle}
