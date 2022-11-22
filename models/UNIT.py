@@ -174,6 +174,15 @@ class UNIT(tf.keras.Model):
     Gbgrads = tape.gradient(l_gb, self.Gb.trainable_weights)
     Dagrads = tape.gradient(l_da, self.Da.trainabel_weights)
     Dbgrads = tape.gradient(l_db, self.Db.trainable_weights)
+    
+    self.Ga_optimizer.apply_gradients(zip(Gagrads, self.Ga.trainable_weights))
+    self.Gb_optimizer.apply_gradients(zip(Gbgrads, self.Gb.trainable_weights))
+    self.Da_optimizer.apply_gradients(zip(Dagrads, self.Da.trainable_weights))
+    self.Db_optimizer.apply_gradients(zip(Dbgrads, self.Db.trainable_weights))
+    
+    return {'l_r':0.5*(l_ra+l_rb), 'l_z':0.5*(l_za + l_zb), 'l_h':0.5*(l_ha + l_hb), 'l_cycle':l_cycle, 
+            'g_loss':0.5*(g_loss_a + g_loss_b), 'd_loss': 0.5 * (d_loss_a + d_loss_b)
+           }
   
   
   @tf.function
