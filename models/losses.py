@@ -9,6 +9,11 @@ def l2_loss(x, y):
     return tf.reduce_mean((x - y) ** 2)
 
 
+#gaussian
+def kl_idv(h):
+    return tf.reduce_mean(h ** 2)
+
+
 def perceptual_loss(source, target, netE):
     feat_source = netE(source, training=True)
     feat_target = netE(target, training=True)
