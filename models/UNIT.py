@@ -66,13 +66,20 @@ class Generator(tf.keras.Model):
     self.D=Decoder(config, opt)
     
   def call(self, x, training=False):
-    h = self.E(x)
+    h, z = self.encode(x)
     if training:
-      z = tf.random.noraml(h.shape)
-      x = self.D(h + z)
+      x = self.decode(h + z)
     else:
       x = self.D(h)
-    return x, h
+    return x
+  
+  def encode(self, x):
+    h = self.E(x)
+    z = tf.random.normal(h.shape)
+    return h, z
+  
+  def decode(self, x):
+    return self.D(x)
 
   
 class UNIT(tf.keras.Model):
@@ -97,6 +104,30 @@ class UNIT(tf.keras.Model):
   @tf.function
   def train_step(self, inputs):
     xa, xb = inputs
+    
+    with tf.GradientTape(persistent=True) as tape:
+      ### forward
+      ha, za = self.Ga.encode(xa)
+      hb, zb = self.Gb.encode(xb)
+      
+      #within domain
+      xar = self.Ga.decode(ha + za)
+      xbr = self.Gb.decode(hb + zb)
+      
+      #cross domain
+      xba = self.Ga.decode(hb + zb)
+      xab = self.Gb.decode(ha + za)
+      
+      #cyclic encode
+      hba, zba = self.Ga.encode(xba)
+      hab, zab = self.Gb.encode(xab)
+      
+      #cyclic decode
+      xaba = self.Ga.decode(hab + zab)
+      xbab = self.Gb.decode(hba + zba)
+      
+      ### compute loss 
+  
   
   @tf.function
   def test_step(self, inputs):
