@@ -90,8 +90,7 @@ class UNIT(tf.keras.Model):
     self.Da = Discriminator(config)
     self.Db = Discriminator(config)
     self.style_dim = config['style_dim']
-    
-    self.inst = tfa.layers.InstanceNormalization(scale=False, center=False)
+    self.config = config
     
   def compile(self,
               Ga_optimizer,
@@ -136,21 +135,45 @@ class UNIT(tf.keras.Model):
       xbab = self.Gb.decode(hba + zb_prime)
       
       #discrimination
+      critic_real_a = self.Da(xa)
+      critic_real_b = self.Db(xb)
+      critic_fake_a = self.Da(xba)
+      critic_fake_b = self.Db(xab)
       
       ### compute loss 
       #reconstruction
-      l_r = l1_loss(xa, xar) + l1_loss(xb, xbr)
+      l_ra = l1_loss(xa, xar)
+      l_rb = l1_loss(xb, xbr)
       
       #latent reconstruction
-      l_z = l1_loss(za, zba) + l1_loss(zb, zab)
+      l_za = l1_loss(za, zba)
+      l_zb = l1_loss(zb, zab)
       
       #content reconstruction
-      l_h = l1_loss(ha, hab) + l1_loss(hb, hba)
+      l_ha = l1_loss(ha, hab)
+      l_hb = l1_loss(hb, hba)
+      
+      #kl-div
+      l_kl_a = l_kl(ha) + l_kl(hab)
+      l_kl_b = l_kl(hb) + l_kl(hba)
       
       #cyclic 
       l_cycle = l1_loss(xa, xaba) + l1_loss(xb, xbab)
       
       #adversarial loss
+      d_loss_a, g_loss_a = gan_loss(critic_real_a, critic_fake_a, self.config['gan_loss'])
+      d_loss_b, g_loss_b = gan_loss(critic_real_b, critic_fake_b, self.config['gan_loss'])
+      
+      
+      l_ga = l_ra + l_za + l_ha + l_kl_a + l_cycle
+      l_gb = l_rb + l_zb + l_hb + l_kl_b + l_cycle
+      l_da = d_loss_a
+      l_db = d_loss_b
+      
+    Gagrads = tape.gradient(l_ga, self.Ga.trainable_weights)
+    Gbgrads = tape.gradient(l_gb, self.Gb.trainable_weights)
+    Dagrads = tape.gradient(l_da, self.Da.trainabel_weights)
+    Dbgrads = tape.gradient(l_db, self.Db.trainable_weights)
   
   
   @tf.function
