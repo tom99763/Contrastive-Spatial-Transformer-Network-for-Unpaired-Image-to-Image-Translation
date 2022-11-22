@@ -89,6 +89,7 @@ class UNIT(tf.keras.Model):
     self.Gb = Generator(config, opt)
     self.Da = Discriminator(config)
     self.Db = Discriminator(config)
+    self.style_dim = config['style_dim']
     
     self.inst = tfa.layers.InstanceNormalization(scale=False, center=False)
     
@@ -109,27 +110,47 @@ class UNIT(tf.keras.Model):
     xa, xb = inputs
     
     with tf.GradientTape(persistent=True) as tape:
+      za = tf.random.normal((xa.shape[0], 1, 1, self.style_dim))
+      zb = tf.random.normal((xb.shape[0], 1, 1, self.style_dim))
+      
+      
       ### forward
-      ha, za = self.Ga.encode(xa)
-      hb, zb = self.Gb.encode(xb)
+      #encode
+      ha, za_prime = self.Ga.encode(xa)
+      hb, zb_prime = self.Gb.encode(xb)
       
       #within domain
-      xar = self.Ga.decode(ha + za)
-      xbr = self.Gb.decode(hb + zb)
+      xar = self.Ga.decode(ha + za_prime)
+      xbr = self.Gb.decode(hb + zb_prime)
       
       #cross domain
-      xba = self.Ga.decode(hb + zb)
-      xab = self.Gb.decode(ha + za)
+      xba = self.Ga.decode(hb + za)
+      xab = self.Gb.decode(ha + zb)
       
       #cyclic encode
       hba, zba = self.Ga.encode(xba)
       hab, zab = self.Gb.encode(xab)
       
       #cyclic decode
-      xaba = self.Ga.decode(hab + zab)
-      xbab = self.Gb.decode(hba + zba)
+      xaba = self.Ga.decode(hab + za_prime)
+      xbab = self.Gb.decode(hba + zb_prime)
+      
+      #discrimination
       
       ### compute loss 
+      #reconstruction
+      l_r = l1_loss(xa, xar) + l1_loss(xb, xbr)
+      
+      #latent reconstruction
+      l_z = l1_loss(za, zba) + l1_loss(zb, zab)
+      
+      #content reconstruction
+      l_h = l1_loss(ha, hab) + l1_loss(hb, hba)
+      
+      #cyclic 
+      l_cycle = l1_loss(xa, xaba) + l1_loss(xb, xbab)
+      
+      #adversarial loss
   
   
   @tf.function
