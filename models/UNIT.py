@@ -7,40 +7,6 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 
-class VAEGen(nn.Module):
-    # VAE architecture
-    def __init__(self, input_dim, params):
-        super(VAEGen, self).__init__()
-        dim = params['dim']
-        n_downsample = params['n_downsample']
-        n_res = params['n_res']
-        activ = params['activ']
-        pad_type = params['pad_type']
-
-        # content encoder
-        self.enc = ContentEncoder(n_downsample, n_res, input_dim, dim, 'in', activ, pad_type=pad_type)
-        self.dec = Decoder(n_downsample, n_res, self.enc.output_dim, input_dim, res_norm='in', activ=activ, pad_type=pad_type)
-
-    def forward(self, images):
-        # This is a reduced VAE implementation where we assume the outputs are multivariate Gaussian distribution with mean = hiddens and std_dev = all ones.
-        hiddens = self.encode(images)
-        if self.training == True:
-            noise = Variable(torch.randn(hiddens.size()).cuda(hiddens.data.get_device()))
-            images_recon = self.decode(hiddens + noise)
-        else:
-            images_recon = self.decode(hiddens)
-        return images_recon, hiddens
-
-    def encode(self, images):
-        hiddens = self.enc(images)
-        noise = Variable(torch.randn(hiddens.size()).cuda(hiddens.data.get_device()))
-        return hiddens, noise
-
-    def decode(self, hiddens):
-        images = self.dec(hiddens)
-        return images
-
-
 class Encoder(tf.keras.Model):
   def __init__(self, config):
     super().__init__()
@@ -100,6 +66,12 @@ class Generator(tf.keras.Model):
     self.D=Decoder(config, opt)
     
   def call(self, x):
+    return 
+
+  def encode(self, x):
+    return 
+
+  def decode(self, x):
     return 
   
 class UNIT(tf.keras.Model):
