@@ -65,14 +65,15 @@ class Generator(tf.keras.Model):
     self.E=Encoder(config)
     self.D=Decoder(config, opt)
     
-  def call(self, x):
-    return 
+  def call(self, x, training=False):
+    h = self.E(x)
+    if training:
+      z = tf.random.noraml(h.shape)
+      x = self.D(h + z)
+    else:
+      x = self.D(h)
+    return x, h
 
-  def encode(self, x):
-    return 
-
-  def decode(self, x):
-    return 
   
 class UNIT(tf.keras.Model):
   def __init__(self, config, opt):
