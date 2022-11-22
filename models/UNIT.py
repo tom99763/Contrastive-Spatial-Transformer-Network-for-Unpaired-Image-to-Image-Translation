@@ -4,6 +4,7 @@ from modules import *
 from losses import *
 from discriminators import Discriminator
 import tensorflow as tf
+import tensorflow_addons as tfa
 from tensorflow.keras import layers
 
 
@@ -88,6 +89,8 @@ class UNIT(tf.keras.Model):
     self.Gb = Generator(config, opt)
     self.Da = Discriminator(config)
     self.Db = Discriminator(config)
+    
+    self.inst = tfa.layers.InstanceNormalization(scale=False, center=False)
     
   def compile(self,
               Ga_optimizer,
