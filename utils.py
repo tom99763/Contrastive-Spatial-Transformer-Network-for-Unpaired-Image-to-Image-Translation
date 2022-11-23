@@ -1,7 +1,7 @@
 import os
 import tensorflow as tf
 from sklearn.model_selection import train_test_split as ttp
-from models import CUT, InfoMatch
+from models import CUT, InfoMatch, CycleGAN, UNIT, UGATIT
 from tensorflow.keras import callbacks
 import matplotlib.pyplot as plt
 import yaml
@@ -13,11 +13,25 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 def load_model(opt):
     config = get_config(f'./configs/{opt.model}.yaml')
     if opt.model == 'CUT':
-        model = CUT.CUT(config)
+        model = CUT.CUT(config, opt)
         params = f"{config['tau']}_{config['lambda_nce']}_{config['use_identity']}"
+
     elif opt.model == 'InfoMatch':
-        model = InfoMatch.InfoMatch(config)
+        model = InfoMatch.InfoMatch(config, opt)
         params = f"{config['loss_type']}_{config['tau']}_{config['use_identity']}"
+
+    elif opt.model == 'CycleGAN':
+        model = CycleGAN.CycleGAN(config, opt)
+        params='_'
+
+    elif opt.model == 'UNIT':
+        model = UNIT.UNIT(config, opt)
+        params='_'
+
+    elif opt.model == 'UGATIT':
+        model = UGATIT.UGATIT(config, opt)
+        params='_'
+
     return model, params
 
 
@@ -25,12 +39,10 @@ def get_config(config):
     with open(config, 'r') as stream:
         return yaml.load(stream, Loader=yaml.FullLoader)
 
-
-def get_image(pth, opt, channels = 3):
-    image = tf.image.decode_jpeg(tf.io.read_file(pth), channels=channels)
+def get_image(pth, opt):
+    image = tf.image.decode_jpeg(tf.io.read_file(pth), channels=opt.num_channels)
     image = tf.cast(tf.image.resize(image, (opt.image_size, opt.image_size)), 'float32')
     return (image-127.5)/127.5
-
 
 def build_tf_dataset(source_list, target_list, opt):
     ds_source = tf.data.Dataset.from_tensor_slices(source_list).map(lambda pth: get_image(pth, opt),
@@ -147,6 +159,17 @@ class VisualizeCallback(callbacks.Callback):
             x2y_wrapped, grids = self.model.CP(self.source)
             x2y, rxy = self.model.R(x2y_wrapped)
             grids = tf.transpose(grids, [0, 2, 3, 1])
+
+        elif self.opt.model == 'CycleGAN':
+            x2y = self.model.Gb(self.source)
+
+        elif self.opt.model == 'UNIT':
+            ha, _ = self.model.Ga.encode(self.source)
+            x2y = self.model.Gb.decode(ha)
+
+        elif self.opt.model == 'UGATIT':
+            x2y, _ = self.model.Gb(self.source)
+
         else:
             x2y = self.model.G(self.source)
 
@@ -155,13 +178,13 @@ class VisualizeCallback(callbacks.Callback):
         for i in range(b):
 
             if self.opt.model == 'InfoMatch':
-                ax[0, i].imshow(self.source[i] * 0.5 + 0.5)
+                ax[0, i].imshow(self.source[i] * 0.5 + 0.5, cmap='gray')
                 ax[0, i].axis('off')
-                ax[1, i].imshow(x2y_wrapped[i] * 0.5 + 0.5)
+                ax[1, i].imshow(x2y_wrapped[i] * 0.5 + 0.5, cmap='gray')
                 ax[1, i].axis('off')
-                ax[2, i].imshow(rxy[i] * 0.5 + 0.5)
+                ax[2, i].imshow(rxy[i] * 0.5 + 0.5, cmap='gray')
                 ax[2, i].axis('off')
-                ax[3, i].imshow(x2y[i] * 0.5 + 0.5)
+                ax[3, i].imshow(x2y[i] * 0.5 + 0.5, cmap='gray')
                 ax[3, i].axis('off')
                 grid_img = viz_flow(grids[i, ..., 0], grids[i, ..., 1])
                 ax[4, i].imshow(grid_img)
