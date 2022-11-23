@@ -3,7 +3,7 @@ import tensorflow as tf
 
 
 class Discriminator(tf.keras.Model):
-  def __init__(self, config):
+  def __init__(self, config, *kwargs):
     super().__init__()
     disc_type = config['disc_type']
     
@@ -15,6 +15,9 @@ class Discriminator(tf.keras.Model):
       
     elif disc_type == 'perceptual':
       self.disc = Perceptual_Discriminator(config)
+      
+    elif disc_type == 'cam':
+      self.disc = CAM_Discriminator(config, n_layer)
     
     elif disc_type == 'Multi_scale':
       self.disc = None
