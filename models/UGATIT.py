@@ -63,9 +63,6 @@ class Decoder(tf.keras.Model):
                                          use_bias=self.use_bias, norm_layer='layer_instance', activation=self.act))
     self.blocks.add(Padding2D(3, pad_type='reflect'))
     self.blocks.add(ConvBlock(opt.num_channels, 7, padding='valid', activation='tanh'))
-    
-    #wmap
-    self.wMap = tf.keras.Sequential([layers.Dense(config[''])])
   
   def call(self, x):
     w, cam_logits = self.cam(x)
@@ -114,5 +111,36 @@ class Generator(tf.keras.Model):
     return x, cam_logits
 
 
-class UGATIT:
-  pass
+class UGATIT(tf.keras.Model):
+  def __init__(self, config, opt):
+    super().__init__()
+    
+    self.Ga = Generator(config, opt)
+    self.Gb = Generator(config, opt)
+    
+    def compile(self,
+                Ga_optimizer,
+                Gb_optimizer,
+                Da_optimizer,
+                Db_optimizer
+                ):
+        super().compile()
+        self.Ga_optimizer = Ga_optimizer
+        self.Gb_optimizer = Gb_optimizer
+        self.Da_optimizer = Da_optimizer
+        self.Db_optimizer = Db_optimizer
+        
+    @tf.function
+    def train_step(self, inputs):
+      xa, xb = inputs
+      
+      
+    def test_step(self, inputs):
+      xa, xb = inputs
+      
+      
+    
+    
+    
+    
+    
