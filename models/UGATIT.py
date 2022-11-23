@@ -41,44 +41,46 @@ class Decoder(tf.keras.Model):
     self.norm = config['norm']
     self.num_downsampls = config['num_downsamples']
     self.num_resblocks = config['num_resblocks']
-    dim = config['base']    
+    dim = config['max_filters']  
     
     #cam 
     self.gap=layers.GloablAveragePooling2D()
     self.gmp=layers.GlobalMaxPooling2D()
-    self.w = tf.Variable(tf.random.normal([self.config['max_filters'], 1]), trainable=True)
-    self.fuse = ConvBlock(config['max_filters'], 1, padding='valid', 
+    self.w = tf.Variable(tf.random.normal([dim, 1]), trainable=True)
+    self.fuse = ConvBlock(dim, 1, padding='valid', 
                           use_bias=self.use_bias, activation=self.act)
     
     #upsample
-    self.blocks=[AdaLINResBlock() for _ in range(self.num_resblocks)]
+    self.resblocks=[Resblock(dim ,3, self.use_bias, 'adaptive_layer_instance') for _ in range(self.num_resblocks)]
     
+    self.blocks = tf.keras.Sequential()
     for _ in range(self.num_downsampls):
       dim  = dim / 2
       self.blocks.add(ConvTransposeBlock(dim, 3, strides=2, padding='same',
                                          use_bias=self.use_bias, norm_layer='layer_instance', activation=self.act))
     self.blocks.add(Padding2D(3, pad_type='reflect'))
-    self.blocks.add(ConvBlock(3, 7, padding='valid', activation='tanh'))
+    self.blocks.add(ConvBlock(opt.num_channels, 7, padding='valid', activation='tanh'))
   
   def call(self, x):
-    w = self.cam(x)
-    for block in self.blocks:
+    w, cam_logits = self.cam(x)
+    for block in self.resblocks:
       x = self.block([x, w])
-    return x
+    x = self.blocks(x)
+    return x, cam_logits
   
   def cam(self):
     #global average pooling
     cam_gap = self.gap(x)
-    cam_gap_logit, cam_gap_weight = self.cMap(cam_gap)
-    x_gap = x * cam_gap_weight
+    cam_gap_logits, cam_gap_weights = self.cMap(cam_gap)
+    x_gap = x * cam_gap_weights
     
     #global maximam pooling
     cam_gmp = self.mlp(x)
-    cam_gmp_logit, cam_gmp_weight = self.cMap(cam_gmp)
-    x_gmp = x * cam_gmp_weight
+    cam_gmp_logits, cam_gmp_weights = self.cMap(cam_gmp)
+    x_gmp = x * cam_gmp_weights
     
     #fusion
-    cam_logit = tf.concat([cam_gap_logits, cam_gmp_logits], axis=-1) #(b, hw, 2)
+    cam_logits = tf.concat([cam_gap_logits, cam_gmp_logits], axis=-1) #(b, hw, 2)
     x = tf.concat([x_gap, x_gmp], axis=-1)
     x = self.fuse(x)
     
@@ -94,9 +96,15 @@ class Decoder(tf.keras.Model):
     return x, w
     
 
-
-class Generator:
-  pass
+class Generator(tf.keras.Model):
+  def __init__(self, config, opt):
+    super().__init__()
+    self.E=Encoder(config)
+    self.D=Decoder(config, opt)
+  def call(self, x):
+    x = self.E(x)
+    x ,cam_logits = self.D(x)
+    return x, cam_logits
 
 
 class UGATIT:
