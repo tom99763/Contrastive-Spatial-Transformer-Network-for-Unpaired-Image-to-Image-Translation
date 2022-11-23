@@ -103,16 +103,29 @@ class ConvBlock(layers.Layer):
         elif norm_layer == 'instance':
             self.normalization = InstanceNorm(affine=False)
         elif norm_layer == 'layer_instance':
-            self.normalization = LayerInstanceNorm()
+            self.normalization = LayerInstanceNorm(False)
+        elif norm_layer == 'adaptive_layer_instance':
+            self.normalization = LayerInstanceNorm(True)
         else:
             self.normalization = tf.identity
+            
+        self.norm_layer=norm_layer
 
     def call(self, inputs, training=None):
+        if self.norm_layer == 'adaptive_layer_instance':
+            x, w = inputs
+        else:
+            x=inputs
         x = self.conv2d(inputs)
-        x = self.normalization(x)
+        
+        if self.norm_layer == 'adaptive_layer_instance':
+            x = self.normalization([x, w])
+        else:
+            x = self.normalization(x)
         x = self.activation(x)
         return x
-      
+
+    
 class ConvTransposeBlock(layers.Layer):
     """ ConvTransposeBlock layer consists of Conv2DTranspose + Normalization + Activation.
     """
@@ -139,7 +152,7 @@ class ConvTransposeBlock(layers.Layer):
         elif norm_layer == 'instance':
             self.normalization = InstanceNorm(affine=False)
         elif norm_layer == 'layer_instance':
-            self.normalization = LayerInstanceNorm()
+            self.normalization = LayerInstanceNorm(False)
         else:
             self.normalization = tf.identity
 
@@ -174,6 +187,7 @@ class ResBlock(layers.Layer):
                                      use_bias=use_bias,
                                      norm_layer=norm_layer)
         self.filters = filters
+        self.norm_layer = norm_layer
     def build(self, shape):
         dim = shape[-1]
         if dim != self.filters:
@@ -186,8 +200,16 @@ class ResBlock(layers.Layer):
             self.skip = tf.identity
 
     def call(self, inputs, training=None):
-        x = self.reflect_pad1(inputs)
-        x = self.conv_block1(x)
-        x = self.reflect_pad2(x)
-        x = self.conv_block2(x)
+        if self.norm_layer == 'adaptive_layer_instance':
+            x, w = inputs
+            x = self.reflect_pad1(inputs)
+            x = self.conv_block1([x, w])
+            x = self.reflect_pad2(x)
+            x = self.conv_block2([x, w])
+        else:
+            x = inputs
+            x = self.reflect_pad1(inputs)
+            x = self.conv_block1(x)
+            x = self.reflect_pad2(x)
+            x = self.conv_block2(x)
         return x + self.skip(inputs)
