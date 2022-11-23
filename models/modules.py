@@ -44,6 +44,36 @@ class InstanceNorm(layers.Layer):
         if self.affine:
             return self.gamma * x + self.beta
         return x
+    
+class LayerInstanceNorm(layers.Layer):
+    def __init__(self, adaptive=False):
+        super().__init__()
+        self.in = InstanceNorm(affine=False)
+        self.ln = layers.LayerNormalization()
+        
+        self.rho = tf.Variable(tf.constant(1.0),
+                   constraint= lambda x: tf.clip_by_value(x, 0.0, 1.0))
+        
+        self.adaptive=adaptive
+        
+    def build(self, shape):
+        dim = shape[0][-1]
+        if self.adaptive:
+            self.gamma = layers.Dense(dim)
+            self.beta = layers.Dense(dim)
+        
+    def call(self, inputs):
+        if self.adaptive:
+            x, w = inputs
+        else:
+            x = inputs
+        x_in = self.in(x)
+        x_ln = self.ln(x)
+        rho = tf.clip_by_value(rho - 0.1, 0.0, 1.0)
+        x = rho * x_in + (1 - rho) * x_ln
+        if self.adaptive:
+            x = self.gamma(w) * x + self.beta(w)
+        return x
  
 
 class ConvBlock(layers.Layer):
@@ -72,6 +102,8 @@ class ConvBlock(layers.Layer):
             self.normalization = layers.BatchNormalization()
         elif norm_layer == 'instance':
             self.normalization = InstanceNorm(affine=False)
+        elif norm_layer == 'layer_instance':
+            self.normalization = LayerInstanceNorm()
         else:
             self.normalization = tf.identity
 
@@ -106,6 +138,8 @@ class ConvTransposeBlock(layers.Layer):
             self.normalization = layers.BatchNormalization()
         elif norm_layer == 'instance':
             self.normalization = InstanceNorm(affine=False)
+        elif norm_layer == 'layer_instance':
+            self.normalization = LayerInstanceNorm()
         else:
             self.normalization = tf.identity
 
