@@ -177,8 +177,8 @@ class UGATIT(tf.keras.Model):
         db_loss, gb_loss = gan_loss(critic_real_b, critic_fake_b, self.config['gan_mode'])
         
         #total loss
-        l_ga = l_ra + l_cycle + l_ga_cam + l_dga_cam + ga_loss
-        l_gb = l_rb + l_cycle + l_gb_cam + l_dgb_cam + gb_loss
+        l_ga = 10 * l_ra + 10 * l_cycle + 100 *l_ga_cam + l_dga_cam + ga_loss
+        l_gb = 10 * l_rb + 10 * l_cycle + 100 *l_gb_cam + l_dgb_cam + gb_loss
         l_da = l_da_cam + da_loss
         l_db = l_db_cam + db_loss
 
