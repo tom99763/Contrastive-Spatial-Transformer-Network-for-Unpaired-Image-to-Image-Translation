@@ -37,14 +37,6 @@ class MetricsCallbacks(callbacks.Callback):
         self.train=train
         self.inception_model = self.build_inception()
 
-        if not train:
-            name1 = opt.source_dir.split('/')[-1]
-            name2 = opt.target_dir.split('/')[-1]
-            self.inception_model.load_weights(
-                tf.train.latest_checkpoint(
-                    f"{opt.ckpt_dir}/inception/{name1}2{name2}"))\
-                .expect_partial()
-
     def on_train_begin(self, logs=None):
         self.IS = []
         self.FID = []
@@ -62,6 +54,17 @@ class MetricsCallbacks(callbacks.Callback):
             if self.opt.model =='InfoMatch':
                 xab_wrapped, grids = self.model.CP(xa)
                 xab, _ = self.model.R(xab_wrapped)
+
+            elif self.opt.model == 'CycleGAN':
+                xab = self.model.Gb(xa)
+
+            elif self.opt.model == 'UNIT':
+                ha, _ = self.model.Ga.encode(xa)
+                xab = self.model.Gb.decode(ha)
+
+            elif self.opt.model == 'UGATIT':
+                xab, _ = self.model.Gb(xa)
+
             else:
                 xab = self.model.G(xa)
 
@@ -103,83 +106,12 @@ class MetricsCallbacks(callbacks.Callback):
         return x
 
     def build_inception(self):
-        inception_model = InceptionV3(include_top=False,
+        inception_model = InceptionV3(include_top=True,
                                       weights="imagenet",
                                       pooling='avg')
         inception_model.trainable = False
 
-        feature = inception_model.layers[-1].output
-        prob = layers.Dense(2)(feature)
-        prob = tf.nn.softmax(prob, axis=-1)
-
-
-        if self.train:
-            return tf.keras.Model(inputs=inception_model.input, outputs=[prob])
-        else:
-            pred = tf.argmax(prob, axis=-1)
-            outputs=[pred, feature]
-            return tf.keras.Model(inputs=inception_model.input, outputs=outputs)
-
-
-def parse_opt():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--source_dir', type=str, default='../../datasets/afhq/train/dog')
-    parser.add_argument('--target_dir', type=str, default='../../datasets/afhq/train/cat')
-    parser.add_argument('--ckpt_dir', type=str, default='../checkpoints')
-    parser.add_argument('--output_dir', type=str, default='./outputs')
-    parser.add_argument('--num_epochs', type=int, default=10)
-    parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--image_size', type=int, default=299)
-    parser.add_argument('--val_size', type=int, default=0.1)
-    parser.add_argument('--lr', type=float, default=2e-4, help='learning rate')
-    opt, _ = parser.parse_known_args()
-    return opt
-
-def get_image(opt, pth, label, channels = 3):
-    image = tf.image.decode_jpeg(tf.io.read_file(pth), channels=channels)
-    image = tf.cast(tf.image.resize(image, (opt.image_size, opt.image_size)), 'float32')
-    image = preprocess_input(image)
-    return image, label
-
-
-def train_inception():
-    opt = parse_opt()
-    source_list = list(map(lambda x: f'{opt.source_dir}/{x}', os.listdir(opt.source_dir)))
-    target_list = list(map(lambda x: f'{opt.target_dir}/{x}', os.listdir(opt.target_dir)))
-    length = min(len(source_list), len(target_list))
-    source_list = source_list[:length]
-    target_list = target_list[:length]
-    path_list = source_list + target_list
-    labels = [0] * len(source_list) + [1] * len(target_list)
-
-    AUTOTUNE = tf.data.experimental.AUTOTUNE
-    ds = tf.data.Dataset.from_tensor_slices((path_list, labels)).\
-        map(lambda pth, label: get_image(opt, pth, label)).batch(opt.batch_size).\
-        shuffle(256).prefetch(AUTOTUNE)
-
-    metrics_callback = MetricsCallbacks('none', opt, 'none', train=True)
-    model = metrics_callback.inception_model
-    model.compile(optimizer = optimizers.Adam(learning_rate = opt.lr),
-                  loss = losses.SparseCategoricalCrossentropy(from_logits=False),
-                  metrics = 'acc',
-                  )
-
-    name1 = opt.source_dir.split('/')[-1]
-    name2 = opt.target_dir.split('/')[-1]
-    save_dir = f"{opt.ckpt_dir}/inception/{name1}2{name2}"
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    checkpoint_callback = callbacks.ModelCheckpoint(
-        filepath=f"{save_dir}/{name1}2{name2}", save_weights_only=True)
-    model.fit(ds, callbacks = [checkpoint_callback], epochs=opt.num_epochs)
-
-if __name__ == '__main__':
-    train_inception()
-
-
-
-
-
-
-
-
+        feature = inception_model.layers[-2].output
+        prob =inception_model.layers[-1].output
+        outputs = [prob, feature]
+        return tf.keras.Model(inputs=inception_model.input, outputs=outputs)
