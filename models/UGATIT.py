@@ -182,10 +182,10 @@ class UGATIT(tf.keras.Model):
         l_da = l_da_cam + da_loss
         l_db = l_db_cam + db_loss
 
-      Gagrads = tape.gradient(ga_loss, self.Ga.trainable_weights)
-      Gbgrads = tape.gradient(gb_loss, self.Gb.trainable_weights)
-      Dagrads = tape.gradient(da_loss, self.Da.trainable_weights)
-      Dbgrads = tape.gradient(db_loss, self.Db.trainable_weights)
+      Gagrads = tape.gradient(l_ga, self.Ga.trainable_weights)
+      Gbgrads = tape.gradient(l_gb, self.Gb.trainable_weights)
+      Dagrads = tape.gradient(l_da, self.Da.trainable_weights)
+      Dbgrads = tape.gradient(l_db, self.Db.trainable_weights)
 
       self.Ga_optimizer.apply_gradients(zip(Gagrads, self.Ga.trainable_weights))
       self.Gb_optimizer.apply_gradients(zip(Gbgrads, self.Gb.trainable_weights))
