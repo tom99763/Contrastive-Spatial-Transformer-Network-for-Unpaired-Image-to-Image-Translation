@@ -75,7 +75,7 @@ class CAM_Discriminator(tf.keras.Model):
     
     #class activation map
     self.gap = layers.GlobalAveragePooling2D()
-    self.gmp = layers.GlobalMaxPool()
+    self.gmp = layers.GlobalMaxPool2D()
     self.gap_fc = layers.Dense(1, use_bias=False)
     self.gmp_fc = layers.Dense(1, use_bias=False)
     self.fuse = ConvBlock(dim, 1, activation = tf.nn.leaky_relu)
