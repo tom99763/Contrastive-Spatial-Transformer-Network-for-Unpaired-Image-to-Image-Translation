@@ -31,8 +31,7 @@ class Encoder(tf.keras.Model):
     
   def call(self, x):
     return self.blocks(x)
-
-
+  
 class Decoder(tf.keras.Model):
   def __init__(self, config, opt):
     super().__init__()
@@ -44,16 +43,16 @@ class Decoder(tf.keras.Model):
     self.num_mlps = config['num_mlps']
     dim = config['max_filters']  
     
-    #cam 
-    self.gap=layers.GloablAveragePooling2D()
-    self.gmp=layers.GlobalMaxPool2D()
-    self.w = tf.Variable(tf.random.normal([dim, 1]), trainable=True)
-    self.fuse = ConvBlock(dim, 1, padding='valid', 
-                          use_bias=self.use_bias, activation=self.act)
+    #cam
+    self.gap = layer.GlobalAveragePooling2D()
+    self.gmp = layers.GlobalMaxPool2D()
+    self.gap_fc = layers.Dense(1, use_bias=False) 
+    self.gmp_fc = layers.Dense(1, use_bias=False)
+    self.fuse =  ConvBlock(dim, 1, activation=self.act)
     self.wMap = tf.keras.Sequential([layers.Dense(dim, activation = self.act) for _ in range(self.num_mlps-1)])
     self.wMap.add(layers.Dense(dim))
     
-    #upsample
+    #upsample 
     self.resblocks=[Resblock(dim ,3, self.use_bias, 'adaptive_layer_instance') for _ in range(self.num_resblocks)]
     
     self.blocks = tf.keras.Sequential()
@@ -63,7 +62,7 @@ class Decoder(tf.keras.Model):
                                          use_bias=self.use_bias, norm_layer='layer_instance', activation=self.act))
     self.blocks.add(Padding2D(3, pad_type='reflect'))
     self.blocks.add(ConvBlock(opt.num_channels, 7, padding='valid', activation='tanh'))
-  
+    
   def call(self, x):
     w, cam_logits = self.cam(x)
     for block in self.resblocks:
@@ -71,35 +70,27 @@ class Decoder(tf.keras.Model):
     x = self.blocks(x)
     return x, cam_logits
   
-  def cam(self):
-    #global average pooling
-    cam_gap = self.gap(x)
-    cam_gap_logits, cam_gap_weights = self.cMap(cam_gap)
-    x_gap = x * cam_gap_weights #(b, h, w, c)
+  def cam(self, x):
+    #average
+    gap = self.gap(x)
+    gap_logits = self.gap_fc(gap)
+    gap_weights = self.gap_fc.trainable_weights[0][:, 0] #[dim ,1]
+    x_gap = x * gap_weights
     
-    #global maximam pooling
-    cam_gmp = self.mlp(x)
-    cam_gmp_logits, cam_gmp_weights = self.cMap(cam_gmp)
-    x_gmp = x * cam_gmp_weights #(b, h, w, c)
+    #maximum
+    gmp = self.gap(x)
+    gmp_logits = self.gmp_fc(gmp)
+    gmp_weights = self.gmp_fc.trainable_weights[0][:, 0] #[dim ,1]
+    x_gmp = x * gmp_weights
     
-    #fusion
-    cam_logits = tf.concat([cam_gap_logits, cam_gmp_logits], axis=-1) #(b, hw, 2)
-    x = tf.concat([x_gap, x_gmp], axis=-1) 
+    #output
+    cam_logits = tf.concat([gap_logits, gmp_logits], axis=-1) #(b, )
+    x = tf.concat([x_gap, x_gmp], axis=-1) #(b, h, w, 2c)
     x = self.fuse(x) #(b, h, w, c)
-    
-    #wmap
-    x = self.gap(x)
     w = self.wMap(x)
-    return w, cam_logits #(b, d), (b, hw, 2)
-  
-  def cMap(self, x):
-    b, h, w, c = x.shape
-    x= layers.Flatten()(x) #(b, hw, c)
-    x = x @ self.w #(b, hw, 1)
-    w = tf.gather(tf.transpose(self.w), 0) #(dim, )
-    return x, w
-    
+    return w, cam_logits
 
+    
 class Generator(tf.keras.Model):
   def __init__(self, config, opt):
     super().__init__()
@@ -117,6 +108,8 @@ class UGATIT(tf.keras.Model):
     
     self.Ga = Generator(config, opt)
     self.Gb = Generator(config, opt)
+    self.Da = Discriminator(config)
+    self.Db = Discriminator(config)
     
     def compile(self,
                 Ga_optimizer,
