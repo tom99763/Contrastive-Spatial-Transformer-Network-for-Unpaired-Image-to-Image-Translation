@@ -84,10 +84,27 @@ class CAM_Discriminator(tf.keras.Model):
     
   def call(self, x):
     x = self.blocks(x)
-    
+    #average
     gap = self.gap(x)
     gap_logits = self.gap_fc(gap)
-    gap_weight = self.gap_fc.trainable_weights[0]
+    gap_weights = self.gap_fc.trainable_weights[0]
+    gap_weights = tf.gather(tf.transpose(gap_weights), 0)
+    x_gap = x * gap_weights #(b, h, w, c)
+    
+    #max 
+    gmp = self.gap(x)
+    gmp_logits = self.gmp_fc(gap)
+    gmp_weights = self.gmp_fc.trainable_weights[0]
+    gmp_weights = tf.gather(tf.transpose(gmp_weights), 0)
+    x_gmp = x * gmp_weights #(b, h, w, c)
+    
+    #cam
+    cam_logits = tf.concat([gap_logits, gmp_logits], axis=-1)
+    x = tf.concat([x_gap, x_gmp], axis=-1)
+    x = self.fuse(x)
+    x = self.pad(x)
+    x = self.conv(x)
+    return x, cam_logits
     
     
     
