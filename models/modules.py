@@ -202,12 +202,14 @@ class ResBlock(layers.Layer):
     def call(self, inputs, training=None):
         if self.norm_layer == 'adaptive_layer_instance':
             x, w = inputs
+            skip = self.skip(x)
             x = self.reflect_pad1(inputs)
             x = self.conv_block1([x, w])
             x = self.reflect_pad2(x)
             x = self.conv_block2([x, w])
         else:
             x = inputs
+            skip = self.skip(x)
             x = self.reflect_pad1(inputs)
             x = self.conv_block1(x)
             x = self.reflect_pad2(x)
