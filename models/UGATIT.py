@@ -134,6 +134,9 @@ class UGATIT(tf.keras.Model):
     def train_step(self, inputs):
       xa, xb = inputs
       
+      with tf.GradientTape(persistent=True) as tape:
+        pass
+      
       
     def test_step(self, inputs):
       xa, xb = inputs
