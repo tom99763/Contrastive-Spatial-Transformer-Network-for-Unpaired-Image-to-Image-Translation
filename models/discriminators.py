@@ -54,15 +54,26 @@ class Patch_Discriminator(tf.keras.Model):
   
   
 class CAM_Discriminator(tf.keras.Model):
-  def __init__(self, config, n_layer):
-    super().__init__()
+  def __init__(self, config, n_layer=5):
+    self.act = config['act']
+    self.use_bias = config['use_bias']
+    self.norm = config['norm']
+    self.num_resblocks = config['num_resblocks']
     dim = config['base']
-    norm = config['norm']
-    use_bias = config['use_bias']
-    act = tf.nn.leaky_relu
+    
+    self.blocks = tf.keras.Sequential([
+      ConvBlock(dim, 4, strides=2, padding='same', use_bias=self.use_bias, norm_layer=self.norm, activation=tf.nn.leaky_relu)
+    ])
+    
+    for _ in range(n_layer-3):
+      dim = dim * 2
+      self.blocks.add(ConvBlock(dim, 4, strides=2, padding='same', use_bias=self.use_bias, norm_layer=self.norm, activation=tf.nn.leaky_relu))
+      
+    self.blocks.add(Padding2D(1, pad_type='constant'))
+    self.blocks.add(ConvBlock(512, 4, padding='valid', use_bias=self.use_bias, norm_layer=self.norm, activation=tf.nn.leaky_relu))
+    self.blocks.add(Padding2D(1, pad_type='constant'))
+    self.blocks.add(ConvBlock(1, 4, padding='valid'))
     
   def call(self, x):
     return self.blocks(x)
-  
-  
   
