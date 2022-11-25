@@ -88,8 +88,6 @@ class DCLGAN(tf.keras.Model):
   def __init__(self, config, opt):
     super().__init__()
     
-    
-    
   def compile(self):
     pass
   
