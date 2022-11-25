@@ -7,13 +7,14 @@ from discriminators import *
 from tensorflow.keras import layers
 
 class Generator(tf.keras.Model):
-  def __init__(self, config):
+  def __init__(self, config, opt):
     super().__init__()
     self.act = config['act']
     self.use_bias = config['use_bias']
     self.norm = config['norm']
     self.num_downsampls = config['num_downsamples']
     self.num_resblocks = config['num_resblocks']
+    self.num_channels = opt.num_channels
     dim = config['base']
     
     self.blocks = tf.keras.Sequential([
@@ -34,7 +35,7 @@ class Generator(tf.keras.Model):
       self.blocks.add(ConvTransposeBlock(dim, 3, strides=2, padding='same',
                                          use_bias=self.use_bias, norm_layer=self.norm, activation=self.act))
     self.blocks.add(Padding2D(3, pad_type='reflect'))
-    self.blocks.add(ConvBlock(3, 7, padding='valid', activation='tanh'))
+    self.blocks.add(ConvBlock(self.num_channels, 7, padding='valid', activation='tanh'))
     
   def call(self, x):
     return self.blocks(x)
@@ -87,9 +88,24 @@ class PatchSampleMLP(tf.keras.Model):
 class DCLGAN(tf.keras.Model):
   def __init__(self, config, opt):
     super().__init__()
+    self.Ga = Generator(config, opt)
+    self.Gb = Generator(config, opt)
+    self.Fa = PatchSampleMLP(config)
+    self.Fb = PatchSampleMLP(config)
+    self.Da = Discriminator(config)
+    self.Db = Discriminator(config)
     
-  def compile(self):
-    pass
+  def compile(self,
+              Ga_optimizer,
+              Gb_optimizer,
+              Da_optimizer,
+              Db_optimizer
+              ):
+    super().compile()
+    self.Ga_optimizer = Ga_optimizer
+    self.Gb_optimizer = Gb_optimizer
+    self.Da_optimizer = Da_optimizer
+    self.Db_optimizer = Db_optimizer
   
   @tf.function
   def train_step(self, inputs):
