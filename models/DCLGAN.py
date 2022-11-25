@@ -95,6 +95,14 @@ class DCLGAN(tf.keras.Model):
     self.Da = Discriminator(config)
     self.Db = Discriminator(config)
     
+    self.Ea = Encoder(self.Ga.blocks, config)
+    self.Eb = Encoder(self.Gb.blocks, config)
+    
+    self.gan_mode = config['gan_mode']
+    self.use_identity = config['use_identity']
+    self.lambda_nce = config['lambda_nce']
+    self.tau = config['tau']
+    
   def compile(self,
               Ga_optimizer,
               Gb_optimizer,
@@ -106,10 +114,61 @@ class DCLGAN(tf.keras.Model):
     self.Gb_optimizer = Gb_optimizer
     self.Da_optimizer = Da_optimizer
     self.Db_optimizer = Db_optimizer
+    self.nce_loss_func = PatchNCELoss(self.tau)
   
   @tf.function
   def train_step(self, inputs):
-    pass
+    xa, xb = inputs
+    
+    with tf.GradientTape(persistent=True) as tape:
+      xab = self.Gb(xa)
+      xba = self.Ga(xb)
+      
+      if self.use_identity:
+        xaa = self.Ga(xa)
+        xbb = self.Gb(xb)
+      
+      #discrimination
+      critic_real_a = self.Da(xa)
+      critic_fake_a = self.Da(xba)
+      critic_real_b = self.Db(xb)
+      critic_fake_b = self.Da(xab)
+      
+      ###compute loss
+      #infonce
+      l_nce_a = self.nce_loss_func(xb , xba, self.Ea, self.Fa)
+      l_nce_b = self.nce_loss_func(xa , xab, self.Eb, self.Fb)
+      
+      #identity
+      if use_identity:
+        l_idt_a = l1_loss(xa, xaa)
+        l_idt_b = l1_loss(xb, xbb)
+      else:
+        l_idt_a = 0.
+        l_idt_b = 0.
+      
+      #adversarial 
+      da_loss, ga_loss = gan_loss(critic_real_a, critic_fake_a, self.config['gan_mode'])
+      db_loss, gb_loss = gan_loss(critic_real_b, critic_fake_b, self.config['gan_mode'])
+      
+      l_ga = ga_loss + l_idt_a + l_nce_a
+      l_gb = gb_loss + l_idt_b + l_nce_b
+      l_da = da_loss
+      l_db = db_loss
+
+    Gagrads = tape.gradient(l_ga, self.Ga.trainable_weights)
+    Gbgrads = tape.gradient(l_gb, self.Gb.trainable_weights)
+    Dagrads = tape.gradient(l_da, self.Da.trainable_weights)
+    Dbgrads = tape.gradient(l_db, self.Db.trainable_weights)
+
+    self.Ga_optimizer.apply_gradients(zip(Gagrads, self.Ga.trainable_weights))
+    self.Gb_optimizer.apply_gradients(zip(Gbgrads, self.Gb.trainable_weights))
+    self.Da_optimizer.apply_gradients(zip(Dagrads, self.Da.trainable_weights))
+    self.Db_optimizer.apply_gradients(zip(Dbgrads, self.Db.trainable_weights))
+    
+    return {'nce': 0.5 * (l_nce_a + l_nce_b),'idt': 0.5 * (l_idt_a + l_idt_b),
+            'g_loss': 0.5 * (ga_loss + gb_loss), 'd_loss': 0.5 * (da_loss + db_loss)}
+      
   
   @tf.function
   def test_step(self, inputs):
