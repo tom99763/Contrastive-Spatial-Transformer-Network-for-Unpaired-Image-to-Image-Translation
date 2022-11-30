@@ -46,15 +46,17 @@ class Generator(tf.keras.Model):
         if refinement:
             self.alpha = tf.Variable(0., trainable=True)
 
-    def call(self, x):
+    def call(self, inputs):
         if not self.refinement:
-            grids_shift = self.blocks(x)
+            x, m =inputs
+            grids_shift = self.blocks(tf.concat([x, m], axis=-1))
             grids_shift = grids_shift / 10.
             grids = affine_grid_generator(x.shape[1], x.shape[2], x.shape[0]) + \
                     tf.transpose(grids_shift, perm=[0, 3, 1, 2])
             x_wrapped = bilinear_sampler(x, grids) #wrapping b's shape to a's
             return x_wrapped, grids
         else:
+            x = inputs
             residual = self.blocks(x)
             residual = residual * self.alpha
             x = tf.clip_by_value(residual + x, -1., 1.)
@@ -251,17 +253,17 @@ class InfoMatch(tf.keras.Model):
 
     @tf.function
     def train_step(self, inputs):
-        xa, xb = inputs
+        xa, ma, xb, mb = inputs
 
         with tf.GradientTape(persistent=True) as tape:
-            ###Forward
-            # translation
-            xab_wrapped, _ = self.CP(xa)  # wrap b's shape to a
-            xab, rab = self.R(xab_wrapped) #synthesis by adding residual
-
+            ###Forward 
+            # translation 
+            xab_warped, _ = self.CP([xa, mb])
+            xab, rab = self.R(xab_warped)
+            
             # identity
             if self.config['use_identity']:
-                xb_idt_wrapped, _ = self.CP(xb)
+                xb_idt_wrapped, _ = self.CP([xb, mb])
                 xb_idt, _ = self.CP(xb_idt_wrapped)
 
             # discrimination
@@ -310,15 +312,17 @@ class InfoMatch(tf.keras.Model):
 
     @tf.function
     def test_step(self, inputs):
-        xa, xb = inputs
-        ###Forward
-        # translation
-        xab_wrapped, _ = self.CP(xa)  # wrap b's shape to a
-        xab, rab = self.R(xab_wrapped)  # synthesis by adding residual
-
+        xa, ma, xb, mb = inputs
+        
+        
+        ###Forward 
+        # translation 
+        xab_warped, _ = self.CP([xa, mb])
+        xab, rab = self.R(xab_warped)
+            
         # identity
         if self.config['use_identity']:
-            xb_idt_wrapped, _ = self.CP(xb)
+            xb_idt_wrapped, _ = self.CP([xb, mb])
             xb_idt, _ = self.CP(xb_idt_wrapped)
 
         # perceptual loss
