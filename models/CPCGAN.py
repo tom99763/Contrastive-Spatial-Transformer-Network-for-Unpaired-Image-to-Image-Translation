@@ -267,7 +267,7 @@ class InfoMatch(tf.keras.Model):
                 xb_idt, _ = self.CP(xb_idt_wrapped)
 
             # discrimination
-            critic_real = self.D(xb)
+            critic_real = self.D(xa)
             critic_fake = self.D(xab)
 
             ###compute loss
