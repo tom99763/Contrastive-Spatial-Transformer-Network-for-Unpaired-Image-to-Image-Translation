@@ -1,5 +1,5 @@
 # Perceptual-Contrastive-Generative-Adversarial-Network-for-Unsupervised-Image-to-Image-Translation
 
-### Design concept 
+Implementation of the paper "Perceptual-Contrastive-Generative-Adversarial-Network-for-Unsupervised-Image-to-Image-Translation".
 
-![flowchart](./example/concept.png)
+https://www.sciencedirect.com/science/article/abs/pii/S0893608023003684
