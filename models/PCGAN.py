@@ -5,7 +5,7 @@ from losses import *
 from discriminators import Discriminator
 import tensorflow as tf
 from tensorflow.keras import layers
-from tensorflow.keras.applications.vgg16 import VGG16
+from tensorflow.keras.applications.vgg19 import VGG19, preprocess_input
 
 
 class Generator(tf.keras.Model):
@@ -213,14 +213,14 @@ class PerceptualEncoder(tf.keras.Model):
         return self.vgg(x)
 
     def build_vgg(self):
-        vgg = VGG16(include_top=False)
+        vgg = VGG19(include_top=False)
         vgg.trainable = False
         outputs = [vgg.layers[idx].output for idx in self.nce_layers]
         return tf.keras.Model(inputs=vgg.input, outputs=outputs)
 
 
-class InfoMatch(tf.keras.Model):
-    def __init__(self, config):
+class PCGAN(tf.keras.Model):
+    def __init__(self, config, opt):
         super().__init__()
         self.CP = Generator(config, False)
         self.R = Generator(config, True)
@@ -232,7 +232,9 @@ class InfoMatch(tf.keras.Model):
     def compile(self,
                 G_optimizer,
                 F_optimizer,
-                D_optimizer):
+                D_optimizer,
+                opt,
+                ):
         super().compile()
         self.G_optimizer = G_optimizer
         self.F_optimizer = F_optimizer
@@ -247,6 +249,7 @@ class InfoMatch(tf.keras.Model):
 
     @tf.function
     def train_step(self, inputs):
+        return {}
         xa, xb = inputs
 
         with tf.GradientTape(persistent=True) as tape:
@@ -266,7 +269,15 @@ class InfoMatch(tf.keras.Model):
 
             ###compute loss
             # adversarial loss
-            d_loss, g_loss = gan_loss(critic_real, critic_fake, self.config['gan_mode'])
+            if self.config['multi_scale']:
+                d_loss, g_loss = 0., 0.
+                for i in range(2):
+                    di_loss, gi_loss = gan_loss(
+                        critic_real[i], critic_fake[i], self.config['gan_mode'])
+                    d_loss += di_loss
+                    g_loss += gi_loss
+            else:
+                d_loss, g_loss = gan_loss(critic_real, critic_fake, self.config['gan_mode'])
 
             # perceptual loss
             if self.config['loss_type'] == 'infonce':
@@ -310,15 +321,13 @@ class InfoMatch(tf.keras.Model):
         xab, rab = self.R(xab_wrapped)  # synthesis by adding residual
 
         # identity
-        if self.config['use_identity']:
-            xb_idt_wrapped, _ = self.CP(xb)
-            xb_idt, _ = self.CP(xb_idt_wrapped)
+        xb_idt_wrapped, _ = self.CP(xb)
+        xb_idt, _ = self.CP(xb_idt_wrapped)
 
         # perceptual loss
         if self.config['loss_type'] == 'infonce':
             l_info_trl = self.loss_func(xab_wrapped, xab, self.E, self.F)
-            l_info_idt = self.loss_func(xb_idt_wrapped, xb_idt, self.E, self.F) \
-                if self.config['use_identity'] else 0.
+            l_info_idt = self.loss_func(xb_idt_wrapped, xb_idt, self.E, self.F)
 
         elif self.config['loss_type'] == 'perceptual_distance':
             l_info_trl = self.loss_func(xab_wrapped, xab, self.E)
