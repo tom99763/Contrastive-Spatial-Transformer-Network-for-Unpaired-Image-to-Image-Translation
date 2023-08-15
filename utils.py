@@ -1,7 +1,7 @@
 import os
 import tensorflow as tf
 from sklearn.model_selection import train_test_split as ttp
-from models import CUT, InfoMatch, CycleGAN, UNIT, UGATIT
+from models import CUT, PCGAN, CycleGAN, UNIT, UGATIT, DCLGAN
 from tensorflow.keras import callbacks
 import matplotlib.pyplot as plt
 import yaml
@@ -16,7 +16,7 @@ def load_model(opt):
         model = CUT.CUT(config, opt)
         params = f"{config['tau']}_{config['lambda_nce']}_{config['use_identity']}"
 
-    elif opt.model == 'InfoMatch':
+    elif opt.model == 'PCGAN':
         model = InfoMatch.InfoMatch(config, opt)
         params = f"{config['loss_type']}_{config['tau']}_{config['use_identity']}"
 
@@ -32,6 +32,9 @@ def load_model(opt):
         model = UGATIT.UGATIT(config, opt)
         params='_'
 
+    elif opt.model == 'DCLGAN':
+        model = DCLGAN.DCLGAN(config, opt)
+        params='_'
     return model, params
 
 
@@ -39,37 +42,53 @@ def get_config(config):
     with open(config, 'r') as stream:
         return yaml.load(stream, Loader=yaml.FullLoader)
 
-def get_image(pth, opt):
+def augmentation(x):
+    x = tf.image.random_crop(x, [128, 128, 3])
+    x = tf.image.random_flip_left_right(x)
+    return x
+
+def get_image(pth, opt, train=False):
     image = tf.image.decode_jpeg(tf.io.read_file(pth), channels=opt.num_channels)
-    image = tf.cast(tf.image.resize(image, (opt.image_size, opt.image_size)), 'float32')
+
+    if train:
+        image = tf.cast(tf.image.resize(image, (opt.image_size + 15, opt.image_size + 15)), 'float32')
+        image = augmentation(image)
+    else:
+        image = tf.cast(tf.image.resize(image, (opt.image_size, opt.image_size)), 'float32')
     return (image-127.5)/127.5
 
-def build_tf_dataset(source_list, target_list, opt):
-    ds_source = tf.data.Dataset.from_tensor_slices(source_list).map(lambda pth: get_image(pth, opt),
+def build_tf_dataset(source_list, target_list, opt, train = False):
+    ds_source = tf.data.Dataset.from_tensor_slices(source_list).map(lambda pth: get_image(pth, opt, train),
                                                                     num_parallel_calls=AUTOTUNE).shuffle(256).prefetch(
         AUTOTUNE)
-    ds_target = tf.data.Dataset.from_tensor_slices(target_list).map(lambda pth: get_image(pth, opt),
+    ds_target = tf.data.Dataset.from_tensor_slices(target_list).map(lambda pth: get_image(pth, opt, train),
                                                                     num_parallel_calls=AUTOTUNE).shuffle(256).prefetch(
         AUTOTUNE)
-    ds = tf.data.Dataset.zip((ds_source, ds_target)).shuffle(256).batch(opt.batch_size, drop_remainder=True).prefetch(
-        AUTOTUNE)
+    ds = tf.data.Dataset.zip((ds_source, ds_target)).shuffle(256).batch(opt.batch_size if train
+                        else opt.num_samples, drop_remainder=True).prefetch(AUTOTUNE)
     return ds
 
 
-def build_dataset(opt):
-    source_list = list(map(lambda x: f'{opt.source_dir}/{x}', os.listdir(opt.source_dir)))
-    target_list = list(map(lambda x: f'{opt.target_dir}/{x}', os.listdir(opt.target_dir)))
+def build_dataset(opt, test=False):
+    if test:
+        source_list = list(map(lambda x: f'{opt.source_test_dir}/{x}', os.listdir(opt.source_test_dir)))
+        target_list = list(map(lambda x: f'{opt.target_test_dir}/{x}', os.listdir(opt.target_test_dir)))
+    else:
+        source_list = list(map(lambda x: f'{opt.source_dir}/{x}', os.listdir(opt.source_dir)))
+        target_list = list(map(lambda x: f'{opt.target_dir}/{x}', os.listdir(opt.target_dir)))
     length = min(len(source_list), len(target_list))
     source_list = source_list[:length]
     target_list = target_list[:length]
 
-    source_train, source_val, target_train, target_val = ttp(source_list, target_list, test_size=opt.val_size,
+    if not test:
+        source_train, source_val, target_train, target_val = ttp(source_list, target_list, test_size=opt.val_size,
                                                              random_state=999, shuffle=True)
-
-    ds_train = build_tf_dataset(source_train, target_train, opt)
-    ds_val = build_tf_dataset(source_val, target_val, opt)
-
-    return ds_train, ds_val
+        ds_train = build_tf_dataset(source_train, target_train, opt, True)
+        ds_val = build_tf_dataset(source_val, target_val, opt)
+        return ds_train, ds_val
+    else:
+        ds_test = build_tf_dataset(source_list, target_list, opt)
+        return ds_test
 
 def makecolorwheel():
     # Create a colorwheel for visualization
@@ -160,7 +179,7 @@ class VisualizeCallback(callbacks.Callback):
             x2y, rxy = self.model.R(x2y_wrapped)
             grids = tf.transpose(grids, [0, 2, 3, 1])
 
-        elif self.opt.model == 'CycleGAN':
+        elif self.opt.model == 'CycleGAN' or self.opt.model == 'DCLGAN':
             x2y = self.model.Gb(self.source)
 
         elif self.opt.model == 'UNIT':
