@@ -9,9 +9,10 @@ norm: 'instance'
 #loss
 loss_type: 'infonce'
 disc_type: 'patch'
+multi_scale: True
 gan_mode: 'lsgan'
 units: 256
-num_patches: 256
+num_patches: 1024
 tau: 0.07
-per_layers: [0, 2, 5, 9, 13]
+per_layers: [0, 2, 5, 10, 15, 20]
 use_identity: True
