@@ -7,21 +7,28 @@ class Discriminator(tf.keras.Model):
     def __init__(self, config):
         super().__init__()
         disc_type = config['disc_type']
+        self.multi_scale = config['multi_scale']
 
         if disc_type == 'classic':
             self.disc = None
 
         elif disc_type == 'patch':
-            self.disc = Patch_Discriminator(config)
+            self.disc = Patch_Discriminator(config) if not self.multi_scale else\
+                  [Patch_Discriminator(config) for _ in range(2)]
 
         elif disc_type == 'cam':
-            self.disc = CAM_Discriminator(config)
-
-        elif disc_type == 'Multi_scale':
-            self.disc = None
+            self.disc = CAM_Discriminator(config) if not self.multi_scale else\
+                  [CAM_Discriminator(config) for _ in range(2)]
 
     def call(self, x):
-        return self.disc(x)
+        if self.multi_scale:
+            outputs = []
+            for disc in self.disc:
+                outputs.append(disc(x))
+                x = tf.image.resize(x, [x.shape[1]//2, x.shape[2]//2])
+        else:
+            outputs = self.disc(x)
+        return outputs
 
 
 class Patch_Discriminator(tf.keras.Model):
@@ -110,3 +117,7 @@ class CAM_Discriminator(tf.keras.Model):
         x = self.pad(x)
         x = self.conv(x)
         return x, cam_logits
+
+
+
+
